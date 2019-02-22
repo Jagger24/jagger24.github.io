@@ -6352,14 +6352,14 @@ span.media-medium img{
         padding-bottom:10px;
     }
     #main-navigation .sf-accordion > .sf-expanded{
-        background-color:#5d0000;
+        /*background-color:#5d0000;*/
     }
     #main-navigation .sf-accordion li.sf-depth-1{
         border-top:1px #fff solid;
         clear:both;
     }
     #main-navigation .sf-accordion li.sf-depth-1:hover{
-        background-color:#5d0000;
+        /*background-color:#5d0000;*/
     }
     #main-navigation .sf-accordion li.sf-depth-1 > a{
         text-transform:uppercase;
@@ -6574,7 +6574,7 @@ span.media-medium img{
     }
     nav#main-navigation .home-link:hover{
         display:block;
-        background-color:#5D0000;
+        /*background-color:#5D0000;*/
     }
     nav#main-navigation .links{
         display:block;
@@ -6869,7 +6869,7 @@ span.media-medium img{
     display:table-cell;
 }
 .l-navigation .l-region--navigation .flyout > li.sf-depth-1:hover,.l-navigation .l-region--navigation .megamenu > li.sf-depth-1:hover{
-    background-color:#5D0000;
+    /*background-color:#5D0000;*/
     text-decoration:none;
 }
 .l-navigation .l-region--navigation .flyout > li.sf-depth-1:visited,.l-navigation .l-region--navigation .megamenu > li.sf-depth-1:visited{
@@ -7050,7 +7050,7 @@ span.media-medium img{
 }
 .lt-ie9 .l-navigation .l-region--navigation .home-link:hover,.lt-ie9 .l-navigation .l-region--navigation .search-icon:hover{
     display:block;
-    background-color:#5D0000;
+    /*background-color:#5D0000;*/
 }
 .lt-ie9 .l-navigation .l-region--navigation .home-link{
     background:url(/profiles/osu/themes/osu_omega/images/icon-home.png) no-repeat center center;
@@ -9892,10 +9892,10 @@ div.pane-bundle-video .media-vimeo-video,div.pane-bundle-video .media-youtube-vi
 }
 .osu-person .ui-state-hover{
     border:none;
-    border-bottom:3px solid #5d0000;
+    /*border-bottom:3px solid #5d0000;*/
 }
 .osu-person .ui-state-hover h2,.osu-person .ui-state-hover h2:after{
-    background-color:#5d0000;
+    /*background-color:#5d0000;*/
 }
 .osu-person .ui-state-hover h2{
     text-decoration:underline;
@@ -10190,7 +10190,7 @@ form.osu-people-directory-search-form fieldset #edit-filters-search{
 }
 .lt-ie9 #hover-search-toggle:hover,.lt-ie9 #hover-search-button:hover{
     display:block;
-    background-color:#5D0000;
+    /*background-color:#5D0000;*/
 }
 .lt-ie9 .l-search{
     display:none;
