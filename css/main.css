@@ -6386,9 +6386,9 @@ span.media-medium img{
     #main-navigation .sf-accordion li.sf-depth-1 > ul > li > a.menuparent:before{
         content:"+ ";
     }
-    #main-navigation .sf-accordion li.sf-depth-1 > ul > li:hover{
+    #main-navigation .sf-accord/*ion li.sf-depth-1 > ul > li:hover{
         background-color:#333333;
-    }
+    }*/
     #main-navigation .sf-accordion li.sf-depth-1 > ul > li > ul{
         float:none;
     }
