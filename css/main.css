@@ -6514,7 +6514,7 @@ span.media-medium img{
     }
     nav#main-navigation ul#superfish-1{
         list-style:none;
-        padding:0;
+        padding:3px;
         width:100%;
         display:table;
         table-layout:fixed;
