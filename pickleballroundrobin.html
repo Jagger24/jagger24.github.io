@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Pickleball Tournament - Dynamic Round Robin</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                background-color: #f5f5f5;
+            }
+
+            .container {
+                background-color: white;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+
+            h1 {
+                text-align: center;
+                color: #2c5aa0;
+                margin-bottom: 30px;
+            }
+
+            .controls {
+                display: flex;
+                justify-content: center;
+                gap: 15px;
+                margin-bottom: 30px;
+                flex-wrap: wrap;
+            }
+
+            .btn {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: bold;
+                transition: all 0.3s ease;
+            }
+
+            .btn-export {
+                background-color: #28a745;
+                color: white;
+            }
+
+            .btn-export:hover {
+                background-color: #218838;
+            }
+
+            .btn-import {
+                background-color: #007bff;
+                color: white;
+            }
+
+            .btn-import:hover {
+                background-color: #0056b3;
+            }
+
+            .btn-clear {
+                background-color: #dc3545;
+                color: white;
+            }
+
+            .btn-clear:hover {
+                background-color: #c82333;
+            }
+
+            .btn-generate {
+                background-color: #6f42c1;
+                color: white;
+            }
+
+            .btn-generate:hover {
+                background-color: #5a32a3;
+            }
+
+            .file-input {
+                display: none;
+            }
+
+            .player-count-section {
+                margin-bottom: 30px;
+                background-color: #e9ecef;
+                padding: 20px;
+                border-radius: 8px;
+                text-align: center;
+            }
+
+            .player-count-section h3 {
+                color: #2c5aa0;
+                margin-bottom: 15px;
+            }
+
+            .player-count-input {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+
+            .player-count-input input {
+                padding: 8px 12px;
+                border: 2px solid #ddd;
+                border-radius: 5px;
+                font-size: 16px;
+                text-align: center;
+                width: 80px;
+            }
+
+            .player-count-input input:focus {
+                border-color: #2c5aa0;
+                outline: none;
+            }
+
+            .player-section {
+                margin-bottom: 30px;
+                background-color: #f8f9fa;
+                padding: 15px;
+                border-radius: 8px;
+            }
+
+            .player-section h3 {
+                color: #2c5aa0;
+                margin-bottom: 15px;
+            }
+
+            .player-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 10px;
+                max-width: 100%;
+            }
+
+            .player-input {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-width: 0;
+                width: 100%;
+            }
+
+            .player-input label {
+                font-weight: bold;
+                margin-bottom: 5px;
+                color: #555;
+                text-align: center;
+                word-wrap: break-word;
+                max-width: 100%;
+            }
+
+            .player-input input {
+                padding: 8px;
+                border: 2px solid #ddd;
+                border-radius: 5px;
+                font-size: 14px;
+                text-align: center;
+                width: 120px;
+                max-width: 100%;
+                word-wrap: break-word;
+                white-space: normal;
+                min-height: 20px;
+                resize: none;
+                overflow-wrap: break-word;
+            }
+
+            .player-input input:focus {
+                border-color: #2c5aa0;
+                outline: none;
+            }
+
+            .round {
+                margin-bottom: 40px;
+                border: 2px solid #2c5aa0;
+                border-radius: 10px;
+                padding: 20px;
+                background-color: white;
+            }
+
+            .round h3 {
+                color: #2c5aa0;
+                text-align: center;
+                margin-bottom: 20px;
+                font-size: 1.4em;
+            }
+
+            .matches {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                gap: 30px;
+            }
+
+            .match {
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                padding: 15px;
+                background-color: #f8f9fa;
+            }
+
+            .match h4 {
+                text-align: center;
+                color: #2c5aa0;
+                margin-bottom: 15px;
+            }
+
+            .team {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: 10px;
+                padding: 10px;
+                background-color: white;
+                border-radius: 5px;
+                border: 1px solid #e0e0e0;
+            }
+
+            .team-names {
+                font-weight: bold;
+                color: #333;
+                flex: 1;
+            }
+
+            .score-input {
+                width: 50px;
+                padding: 5px;
+                text-align: center;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                margin-left: 10px;
+            }
+
+            .vs {
+                text-align: center;
+                font-weight: bold;
+                color: #666;
+                margin: 10px 0;
+            }
+
+            .player-display {
+                color: #2c5aa0;
+                font-weight: bold;
+            }
+
+            .summary-section {
+                margin-top: 40px;
+                background-color: #f8f9fa;
+                padding: 20px;
+                border-radius: 10px;
+                border: 2px solid #2c5aa0;
+            }
+
+            .summary-section h3 {
+                color: #2c5aa0;
+                text-align: center;
+                margin-bottom: 20px;
+            }
+
+            .summary-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 15px;
+            }
+
+            .summary-item {
+                background-color: white;
+                padding: 15px;
+                border-radius: 8px;
+                border: 1px solid #ddd;
+                text-align: center;
+                position: relative;
+            }
+
+            .summary-item.winner {
+                background-color: #d4edda;
+                border-color: #28a745;
+                box-shadow: 0 2px 5px rgba(40, 167, 69, 0.3);
+            }
+
+            .summary-item.second {
+                background-color: #fff3cd;
+                border-color: #ffc107;
+                box-shadow: 0 2px 5px rgba(255, 193, 7, 0.3);
+            }
+
+            .summary-item.third {
+                background-color: #f8d7da;
+                border-color: #dc3545;
+                box-shadow: 0 2px 5px rgba(220, 53, 69, 0.3);
+            }
+
+            .rank-badge {
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                background-color: #2c5aa0;
+                color: white;
+                border-radius: 50%;
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+                font-weight: bold;
+            }
+
+            .rank-badge.first {
+                background-color: #ffd700;
+                color: #000;
+            }
+
+            .rank-badge.second {
+                background-color: #c0c0c0;
+                color: #000;
+            }
+
+            .rank-badge.third {
+                background-color: #cd7f32;
+                color: #fff;
+            }
+
+            .player-name {
+                font-weight: bold;
+                color: #2c5aa0;
+                margin-bottom: 5px;
+            }
+
+            .wins,
+            .points {
+                font-size: 14px;
+                color: #666;
+                margin: 2px 0;
+            }
+
+            .rank {
+                font-size: 12px;
+                color: #888;
+                margin-top: 5px;
+                font-style: italic;
+            }
+
+            .toast {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background-color: #28a745;
+                color: white;
+                padding: 15px 20px;
+                border-radius: 5px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+                z-index: 1000;
+                opacity: 0;
+                transform: translateX(100%);
+                transition: all 0.3s ease;
+            }
+
+            .toast.show {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            .toast.error {
+                background-color: #dc3545;
+            }
+
+            .info-text {
+                color: #666;
+                font-size: 14px;
+                margin-top: 10px;
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🏓 Pickleball Tournament - Dynamic Round Robin</h1>
+
+            <!-- Control Buttons -->
+            <div class="controls">
+                <button class="btn btn-export" onclick="exportData()">📤 Export Tournament Data</button>
+                <button class="btn btn-import" onclick="document.getElementById('fileInput').click()">📥 Import Tournament Data</button>
+                <button class="btn btn-clear" onclick="clearAllData()">🗑️ Clear All Data</button>
+                <input type="file" id="fileInput" class="file-input" accept=".json" onchange="importData(event)" />
+            </div>
+
+            <!-- Player Count Section -->
+            <div class="player-count-section">
+                <h3>Tournament Setup</h3>
+                <div class="player-count-input">
+                    <label for="playerCount">Number of Players:</label>
+                    <input type="number" id="playerCount" min="4" max="16" value="8" onchange="generateTournament()" />
+                    <button class="btn btn-generate" onclick="generateTournament()">🔄 Generate Tournament</button>
+                </div>
+                <div class="info-text">
+                    Tournament will have <span id="roundsCount">7</span> rounds with <span id="matchesPerRound">4</span> matches per round
+                </div>
+            </div>
+
+            <!-- Player Names Section -->
+            <div class="player-section">
+                <h3>Player Names</h3>
+                <div class="player-grid" id="playerGrid">
+                    <!-- Player inputs will be generated dynamically -->
+                </div>
+            </div>
+
+            <!-- Tournament Rounds -->
+            <div id="tournamentRounds">
+                <!-- Rounds will be generated dynamically -->
+            </div>
+
+            <!-- Summary Section -->
+            <div class="summary-section">
+                <h3>🏆 Tournament Standings</h3>
+                <div class="summary-grid" id="summaryGrid">
+                    <!-- Summary items will be generated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast notification -->
+        <div id="toast" class="toast"></div>
+
+        <script>
+            let currentPlayerCount = 8;
+            let matchConfigs = [];
+            let playerStats = {};
+
+            // Generate round robin schedule for doubles with unique team pairings
+            function generateRoundRobinSchedule(numPlayers) {
+                const schedule = [];
+
+                // For doubles, we need an even number of players
+                if (numPlayers % 2 !== 0) {
+                    showToast('For doubles matches, please use an even number of players', true);
+                    return [];
+                }
+
+                const players = Array.from({ length: numPlayers }, (_, i) => i + 1);
+                const rounds = numPlayers - 1; // Each player plays with every other player once
+                const usedTeams = new Set(); // Track all used team pairings across all rounds
+
+                for (let round = 0; round < rounds; round++) {
+                    const roundMatches = [];
+                    const usedPlayers = new Set();
+
+                    // Create matches for this round
+                    for (let i = 0; i < numPlayers / 2; i++) {
+                        // Find two unused players for team 1
+                        let team1 = [];
+                        for (let j = 0; j < players.length && team1.length < 2; j++) {
+                            if (!usedPlayers.has(players[j])) {
+                                team1.push(players[j]);
+                            }
+                        }
+
+                        // Check if this team has been used before
+                        const team1Key = `${Math.min(team1[0], team1[1])}-${Math.max(team1[0], team1[1])}`;
+                        if (usedTeams.has(team1Key)) {
+                            // Try to find a different combination for team 1
+                            let foundValidTeam1 = false;
+                            for (let k = 0; k < players.length && !foundValidTeam1; k++) {
+                                for (let l = k + 1; l < players.length && !foundValidTeam1; l++) {
+                                    if (!usedPlayers.has(players[k]) && !usedPlayers.has(players[l])) {
+                                        const testTeam1 = [players[k], players[l]];
+                                        const testTeam1Key = `${Math.min(testTeam1[0], testTeam1[1])}-${Math.max(testTeam1[0], testTeam1[1])}`;
+                                        if (!usedTeams.has(testTeam1Key)) {
+                                            team1 = testTeam1;
+                                            foundValidTeam1 = true;
+                                        }
+                                    }
+                                }
+                            }
+                            if (!foundValidTeam1) continue; // Skip this match if we can't find a valid team 1
+                        }
+
+                        // Find two unused players for team 2
+                        let team2 = [];
+                        for (let j = 0; j < players.length && team2.length < 2; j++) {
+                            if (!usedPlayers.has(players[j]) && !team1.includes(players[j])) {
+                                team2.push(players[j]);
+                            }
+                        }
+
+                        // Check if team 2 has been used before
+                        if (team2.length === 2) {
+                            const team2Key = `${Math.min(team2[0], team2[1])}-${Math.max(team2[0], team2[1])}`;
+                            if (usedTeams.has(team2Key)) {
+                                // Try to find a different combination for team 2
+                                let foundValidTeam2 = false;
+                                for (let k = 0; k < players.length && !foundValidTeam2; k++) {
+                                    for (let l = k + 1; l < players.length && !foundValidTeam2; l++) {
+                                        if (
+                                            !usedPlayers.has(players[k]) &&
+                                            !usedPlayers.has(players[l]) &&
+                                            !team1.includes(players[k]) &&
+                                            !team1.includes(players[l])
+                                        ) {
+                                            const testTeam2 = [players[k], players[l]];
+                                            const testTeam2Key = `${Math.min(testTeam2[0], testTeam2[1])}-${Math.max(testTeam2[0], testTeam2[1])}`;
+                                            if (!usedTeams.has(testTeam2Key)) {
+                                                team2 = testTeam2;
+                                                foundValidTeam2 = true;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!foundValidTeam2) continue; // Skip this match if we can't find a valid team 2
+                            }
+                        }
+
+                        if (team1.length === 2 && team2.length === 2) {
+                            roundMatches.push([team1, team2]);
+
+                            // Mark teams as used
+                            const team1Key = `${Math.min(team1[0], team1[1])}-${Math.max(team1[0], team1[1])}`;
+                            const team2Key = `${Math.min(team2[0], team2[1])}-${Math.max(team2[0], team2[1])}`;
+                            usedTeams.add(team1Key);
+                            usedTeams.add(team2Key);
+
+                            // Mark players as used this round
+                            usedPlayers.add(team1[0]);
+                            usedPlayers.add(team1[1]);
+                            usedPlayers.add(team2[0]);
+                            usedPlayers.add(team2[1]);
+                        }
+                    }
+
+                    if (roundMatches.length > 0) {
+                        schedule.push(roundMatches);
+                    }
+
+                    // Rotate players (except the first one) - this ensures each player plays with every other player
+                    const first = players[0];
+                    const last = players[numPlayers - 1];
+                    for (let i = numPlayers - 1; i > 1; i--) {
+                        players[i] = players[i - 1];
+                    }
+                    players[1] = last;
+                }
+
+                return schedule;
+            }
+
+            // Generate tournament structure
+            function generateTournament() {
+                const playerCount = parseInt(document.getElementById('playerCount').value);
+                if (playerCount < 4 || playerCount > 16) {
+                    showToast('Please enter a number between 4 and 16 players', true);
+                    return;
+                }
+
+                if (playerCount % 2 !== 0) {
+                    showToast('For doubles matches, please use an even number of players', true);
+                    return;
+                }
+
+                currentPlayerCount = playerCount;
+                matchConfigs = generateRoundRobinSchedule(playerCount);
+
+                // Update info text
+                const roundsCount = matchConfigs.length;
+                const matchesPerRound = Math.floor(playerCount / 4); // 4 players per match
+                document.getElementById('roundsCount').textContent = roundsCount;
+                document.getElementById('matchesPerRound').textContent = matchesPerRound;
+
+                generatePlayerInputs();
+                generateTournamentRounds();
+                generateSummarySection();
+
+                // Clear existing data
+                clearScores();
+                updatePlayerDisplays();
+                updateStats();
+
+                showToast(`Doubles tournament generated for ${playerCount} players!`);
+            }
+
+            // Generate player input fields
+            function generatePlayerInputs() {
+                const playerGrid = document.getElementById('playerGrid');
+                playerGrid.innerHTML = '';
+
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const playerDiv = document.createElement('div');
+                    playerDiv.className = 'player-input';
+                    playerDiv.innerHTML = `
+                        <label>Player ${i}</label>
+                        <input type="text" id="player${i}" placeholder="Enter name" />
+                    `;
+                    playerGrid.appendChild(playerDiv);
+                }
+
+                // Add event listeners
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const input = document.getElementById(`player${i}`);
+                    if (input) {
+                        input.addEventListener('input', updatePlayerDisplays);
+                    }
+                }
+            }
+
+            // Generate tournament rounds
+            function generateTournamentRounds() {
+                const tournamentRounds = document.getElementById('tournamentRounds');
+                tournamentRounds.innerHTML = '';
+
+                matchConfigs.forEach((round, roundIndex) => {
+                    const roundDiv = document.createElement('div');
+                    roundDiv.className = 'round';
+                    roundDiv.innerHTML = `<h3>Round ${roundIndex + 1}</h3>`;
+
+                    const matchesDiv = document.createElement('div');
+                    matchesDiv.className = 'matches';
+
+                    round.forEach((match, matchIndex) => {
+                        const matchDiv = document.createElement('div');
+                        matchDiv.className = 'match';
+                        matchDiv.innerHTML = `
+                            <h4>Court ${String.fromCharCode(65 + matchIndex)}</h4>
+                            <div class="team">
+                                <span class="team-names">
+                                    <span class="player-display" data-players="${match[0][0]},${match[0][1]}"></span>
+                                </span>
+                                <input type="number" class="score-input" placeholder="Score" />
+                            </div>
+                            <div class="vs">VS</div>
+                            <div class="team">
+                                <span class="team-names">
+                                    <span class="player-display" data-players="${match[1][0]},${match[1][1]}"></span>
+                                </span>
+                                <input type="number" class="score-input" placeholder="Score" />
+                            </div>
+                        `;
+                        matchesDiv.appendChild(matchDiv);
+                    });
+
+                    roundDiv.appendChild(matchesDiv);
+                    tournamentRounds.appendChild(roundDiv);
+                });
+
+                // Add event listeners to score inputs
+                document.querySelectorAll('.score-input').forEach((input) => {
+                    input.addEventListener('input', updateStats);
+                });
+            }
+
+            // Generate summary section
+            function generateSummarySection() {
+                const summaryGrid = document.getElementById('summaryGrid');
+                summaryGrid.innerHTML = '';
+
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const summaryDiv = document.createElement('div');
+                    summaryDiv.className = 'summary-item';
+                    summaryDiv.id = `summary-${i}`;
+                    summaryDiv.innerHTML = `
+                        <div class="rank-badge" id="rank-badge-${i}">${i}</div>
+                        <div class="player-name">Player ${i}</div>
+                        <div class="wins">0 Wins</div>
+                        <div class="points">0 Points</div>
+                        <div class="rank" id="rank-${i}">${i}th Place</div>
+                    `;
+                    summaryGrid.appendChild(summaryDiv);
+                }
+            }
+
+            // Clear all scores
+            function clearScores() {
+                document.querySelectorAll('.score-input').forEach((input) => {
+                    input.value = '';
+                });
+            }
+
+            // Toast notification function
+            function showToast(message, isError = false) {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.className = `toast ${isError ? 'error' : ''}`;
+                toast.classList.add('show');
+
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
+            }
+
+            // Export tournament data
+            function exportData() {
+                const tournamentData = {
+                    version: '2.0',
+                    timestamp: new Date().toISOString(),
+                    playerCount: currentPlayerCount,
+                    players: {},
+                    scores: [],
+                };
+
+                // Export player names
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const input = document.getElementById(`player${i}`);
+                    tournamentData.players[i] = input ? input.value || `Player ${i}` : `Player ${i}`;
+                }
+
+                // Export scores
+                const scoreInputs = document.querySelectorAll('.score-input');
+                scoreInputs.forEach((input, index) => {
+                    tournamentData.scores[index] = input.value || '';
+                });
+
+                // Create and download file
+                const dataStr = JSON.stringify(tournamentData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `pickleball-doubles-tournament-${currentPlayerCount}players-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                showToast('Tournament data exported successfully!');
+            }
+
+            // Import tournament data
+            function importData(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        const tournamentData = JSON.parse(e.target.result);
+
+                        // Validate data structure
+                        if (!tournamentData.players || !tournamentData.scores) {
+                            throw new Error('Invalid tournament data format');
+                        }
+
+                        // Set player count and regenerate tournament
+                        if (tournamentData.playerCount) {
+                            document.getElementById('playerCount').value = tournamentData.playerCount;
+                            generateTournament();
+                        }
+
+                        // Import player names
+                        for (let i = 1; i <= currentPlayerCount; i++) {
+                            const input = document.getElementById(`player${i}`);
+                            if (input && tournamentData.players[i]) {
+                                input.value = tournamentData.players[i];
+                            }
+                        }
+
+                        // Import scores
+                        const scoreInputs = document.querySelectorAll('.score-input');
+                        tournamentData.scores.forEach((score, index) => {
+                            if (index < scoreInputs.length && score !== '') {
+                                scoreInputs[index].value = score;
+                            }
+                        });
+
+                        // Update displays
+                        updatePlayerDisplays();
+                        updateStats();
+
+                        showToast('Tournament data imported successfully!');
+                    } catch (error) {
+                        console.error('Import error:', error);
+                        showToast('Error importing tournament data. Please check the file format.', true);
+                    }
+                };
+
+                reader.readAsText(file);
+                event.target.value = '';
+            }
+
+            // Clear all data
+            function clearAllData() {
+                if (confirm('Are you sure you want to clear all tournament data? This action cannot be undone.')) {
+                    // Clear player names
+                    for (let i = 1; i <= currentPlayerCount; i++) {
+                        const input = document.getElementById(`player${i}`);
+                        if (input) input.value = '';
+                    }
+
+                    // Clear scores
+                    clearScores();
+
+                    // Update displays
+                    updatePlayerDisplays();
+                    updateStats();
+
+                    showToast('All tournament data cleared!');
+                }
+            }
+
+            // Update player display when names are entered
+            function updatePlayerDisplays() {
+                const players = {};
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const input = document.getElementById(`player${i}`);
+                    players[i] = input ? input.value || `Player ${i}` : `Player ${i}`;
+                }
+
+                // Update all player displays in matches
+                document.querySelectorAll('.player-display').forEach((display) => {
+                    const playerNumbers = display.getAttribute('data-players').split(',');
+                    const playerNames = playerNumbers.map((num) => players[parseInt(num)]);
+                    display.textContent = playerNames.join(' & ');
+                });
+
+                // Update summary section player names
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const summaryElement = document.getElementById(`summary-${i}`);
+                    if (summaryElement) {
+                        const playerNameElement = summaryElement.querySelector('.player-name');
+                        if (playerNameElement) {
+                            playerNameElement.textContent = players[i];
+                        }
+                    }
+                }
+
+                // Update stats
+                updateStats();
+            }
+
+            function updateStats() {
+                const scoreInputs = document.querySelectorAll('.score-input');
+                playerStats = {};
+
+                // Initialize stats for all players
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    playerStats[i] = { wins: 0, points: 0, playerId: i };
+                }
+
+                // Process each match
+                let scoreIndex = 0;
+                matchConfigs.forEach((round) => {
+                    round.forEach((match) => {
+                        const team1Score = parseInt(scoreInputs[scoreIndex].value) || 0;
+                        const team2Score = parseInt(scoreInputs[scoreIndex + 1].value) || 0;
+                        scoreIndex += 2;
+
+                        // Add points to each player on both teams
+                        match[0].forEach((player) => {
+                            playerStats[player].points += team1Score;
+                        });
+                        match[1].forEach((player) => {
+                            playerStats[player].points += team2Score;
+                        });
+
+                        // Determine winner and add wins to all players on winning team
+                        if (team1Score > team2Score) {
+                            match[0].forEach((player) => {
+                                playerStats[player].wins += 1;
+                            });
+                        } else if (team2Score > team1Score) {
+                            match[1].forEach((player) => {
+                                playerStats[player].wins += 1;
+                            });
+                        }
+                    });
+                });
+
+                // Sort players by wins (descending), then by points (descending) as tie-breaker
+                const sortedPlayers = Object.values(playerStats).sort((a, b) => {
+                    if (b.wins !== a.wins) {
+                        return b.wins - a.wins;
+                    }
+                    return b.points - a.points;
+                });
+
+                // Update the display with rankings
+                for (let i = 0; i < sortedPlayers.length; i++) {
+                    const player = sortedPlayers[i];
+                    const summaryElement = document.getElementById(`summary-${player.playerId}`);
+                    const rankBadge = document.getElementById(`rank-badge-${player.playerId}`);
+                    const rankText = document.getElementById(`rank-${player.playerId}`);
+
+                    if (summaryElement) {
+                        const winsElement = summaryElement.querySelector('.wins');
+                        const pointsElement = summaryElement.querySelector('.points');
+
+                        if (winsElement) {
+                            winsElement.textContent = `${player.wins} Wins`;
+                        }
+                        if (pointsElement) {
+                            pointsElement.textContent = `${player.points} Points`;
+                        }
+
+                        // Update rank badge
+                        if (rankBadge) {
+                            rankBadge.textContent = i + 1;
+
+                            // Style rank badges
+                            rankBadge.className = 'rank-badge';
+                            if (i === 0) {
+                                rankBadge.classList.add('first');
+                                summaryElement.classList.add('winner');
+                                summaryElement.classList.remove('second', 'third');
+                            } else if (i === 1) {
+                                rankBadge.classList.add('second');
+                                summaryElement.classList.add('second');
+                                summaryElement.classList.remove('winner', 'third');
+                            } else if (i === 2) {
+                                rankBadge.classList.add('third');
+                                summaryElement.classList.add('third');
+                                summaryElement.classList.remove('winner', 'second');
+                            } else {
+                                summaryElement.classList.remove('winner', 'second', 'third');
+                            }
+                        }
+
+                        // Update rank text
+                        if (rankText) {
+                            const place = i + 1;
+                            let placeText;
+                            if (place === 1) placeText = '1st Place';
+                            else if (place === 2) placeText = '2nd Place';
+                            else if (place === 3) placeText = '3rd Place';
+                            else placeText = `${place}th Place`;
+
+                            rankText.textContent = placeText;
+                        }
+                    }
+                }
+            }
+
+            // Initialize tournament on page load
+            window.onload = function () {
+                generateTournament();
+            };
+        </script>
+    </body>
+</html>
