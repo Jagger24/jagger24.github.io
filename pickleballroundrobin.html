@@ -79,6 +79,12 @@
                     }
                 }
                 
+                // Shuffle partnerships for variety between attempts
+                for (let i = allPartnerships.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [allPartnerships[i], allPartnerships[j]] = [allPartnerships[j], allPartnerships[i]];
+                }
+                
                 // Track used partnerships to prevent duplicates
                 const usedPartnerships = new Set();
                 const rounds = numPlayers - 1;
@@ -167,7 +173,27 @@
                 }
 
                 currentPlayerCount = playerCount;
-                matchConfigs = generateRoundRobinSchedule(playerCount);
+                
+                // Try to generate tournament, with automatic rerun if it fails
+                let attempts = 0;
+                const maxReruns = 10;
+                
+                do {
+                    attempts++;
+                    matchConfigs = generateRoundRobinSchedule(playerCount);
+                    
+                    // If we got 0 rounds, try again
+                    if (matchConfigs.length === 0) {
+                        console.log(`Tournament generation failed, attempt ${attempts}/${maxReruns}`);
+                        if (attempts < maxReruns) {
+                            showToast(`Generating tournament... (attempt ${attempts + 1}/${maxReruns})`);
+                            continue;
+                        } else {
+                            showToast('Could not generate a valid tournament after multiple attempts. Please try again.', true);
+                            return;
+                        }
+                    }
+                } while (matchConfigs.length === 0 && attempts < maxReruns);
 
                 // Update info text
                 const roundsCount = matchConfigs.length;
@@ -184,7 +210,11 @@
                 updatePlayerDisplays();
                 updateStats();
 
-                showToast(`Doubles tournament generated for ${playerCount} players!`);
+                if (attempts > 1) {
+                    showToast(`Doubles tournament generated for ${playerCount} players! (took ${attempts} attempts)`);
+                } else {
+                    showToast(`Doubles tournament generated for ${playerCount} players!`);
+                }
             }
 
             // Generate player input fields
@@ -298,10 +328,11 @@
             // Export tournament data
             function exportData() {
                 const tournamentData = {
-                    version: '2.0',
+                    version: '3.0',
                     timestamp: new Date().toISOString(),
                     playerCount: currentPlayerCount,
                     players: {},
+                    tournamentStructure: matchConfigs,
                     scores: [],
                 };
 
@@ -311,10 +342,25 @@
                     tournamentData.players[i] = input ? input.value || `Player ${i}` : `Player ${i}`;
                 }
 
-                // Export scores
+                // Export scores with match structure
                 const scoreInputs = document.querySelectorAll('.score-input');
-                scoreInputs.forEach((input, index) => {
-                    tournamentData.scores[index] = input.value || '';
+                let scoreIndex = 0;
+                matchConfigs.forEach((round, roundIndex) => {
+                    round.forEach((match, matchIndex) => {
+                        const team1Score = scoreInputs[scoreIndex] ? scoreInputs[scoreIndex].value || '' : '';
+                        const team2Score = scoreInputs[scoreIndex + 1] ? scoreInputs[scoreIndex + 1].value || '' : '';
+                        
+                        tournamentData.scores.push({
+                            round: roundIndex + 1,
+                            match: matchIndex + 1,
+                            team1: match[0],
+                            team2: match[1],
+                            team1Score: team1Score,
+                            team2Score: team2Score
+                        });
+                        
+                        scoreIndex += 2;
+                    });
                 });
 
                 // Create and download file
@@ -344,14 +390,31 @@
                         const tournamentData = JSON.parse(e.target.result);
 
                         // Validate data structure
-                        if (!tournamentData.players || !tournamentData.scores) {
+                        if (!tournamentData.players) {
                             throw new Error('Invalid tournament data format');
                         }
 
                         // Set player count and regenerate tournament
                         if (tournamentData.playerCount) {
                             document.getElementById('playerCount').value = tournamentData.playerCount;
-                            generateTournament();
+                            
+                            // If we have tournament structure, use it; otherwise generate new one
+                            if (tournamentData.tournamentStructure) {
+                                currentPlayerCount = tournamentData.playerCount;
+                                matchConfigs = tournamentData.tournamentStructure;
+                                
+                                // Update info text
+                                const roundsCount = matchConfigs.length;
+                                const matchesPerRound = Math.floor(tournamentData.playerCount / 4);
+                                document.getElementById('roundsCount').textContent = roundsCount;
+                                document.getElementById('matchesPerRound').textContent = matchesPerRound;
+
+                                generatePlayerInputs();
+                                generateTournamentRounds();
+                                generateSummarySection();
+                            } else {
+                                generateTournament();
+                            }
                         }
 
                         // Import player names
@@ -363,12 +426,29 @@
                         }
 
                         // Import scores
-                        const scoreInputs = document.querySelectorAll('.score-input');
-                        tournamentData.scores.forEach((score, index) => {
-                            if (index < scoreInputs.length && score !== '') {
-                                scoreInputs[index].value = score;
+                        if (tournamentData.scores && tournamentData.scores.length > 0) {
+                            // New format with structured scores
+                            if (typeof tournamentData.scores[0] === 'object') {
+                                const scoreInputs = document.querySelectorAll('.score-input');
+                                let scoreIndex = 0;
+                                
+                                tournamentData.scores.forEach((scoreData) => {
+                                    if (scoreIndex < scoreInputs.length) {
+                                        scoreInputs[scoreIndex].value = scoreData.team1Score || '';
+                                        scoreInputs[scoreIndex + 1].value = scoreData.team2Score || '';
+                                        scoreIndex += 2;
+                                    }
+                                });
+                            } else {
+                                // Old format with simple array
+                                const scoreInputs = document.querySelectorAll('.score-input');
+                                tournamentData.scores.forEach((score, index) => {
+                                    if (index < scoreInputs.length && score !== '') {
+                                        scoreInputs[index].value = score;
+                                    }
+                                });
                             }
-                        });
+                        }
 
                         // Update displays
                         updatePlayerDisplays();
