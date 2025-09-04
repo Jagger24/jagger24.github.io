@@ -5,6 +5,15 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Pickleball Tournament - Dynamic Round Robin</title>
         <link rel="stylesheet" href="styles.css">
+        <script src="tournament-data-4.js"></script> <!-- Verified -->
+        <script src="tournament-data-5.js"></script> <!-- Verified -->
+        <script src="tournament-data-6.js"></script> <!-- Needs Fixed -->
+        <script src="tournament-data-7.js"></script> <!-- NEEDS FIXED -->
+        <script src="tournament-data-8.js"></script> <!-- Verified -->
+        <script src="tournament-data-9.js"></script> <!-- Verified-->
+        <script src="tournament-data-10.js"></script> <!-- NEEDS FIXED -->
+        <script src="tournament-data-11.js"></script> <!-- NEEDS FIXED -->
+        <script src="tournament-data-12.js"></script> <!-- NEEDS FIXED -->
     </head>
     <body>
         <div class="container">
@@ -26,6 +35,17 @@
                     <div class="tournament-options">
                         <button class="btn btn-tournament" onclick="loadTournament(4)">4 Players Tournament</button>
                         <button class="btn btn-tournament" onclick="loadTournament(5)">5 Players Tournament</button>
+                        <!-- <button class="btn btn-tournament" onclick="loadTournament(6)">6 Players Tournament</button> -->
+                        <!-- <button class="btn btn-tournament" onclick="loadTournament(7)">7 Players Tournament</button> -->
+                        <button class="btn btn-tournament" onclick="loadTournament(8)">8 Players Tournament</button>
+                        <button class="btn btn-tournament" onclick="loadTournament(9)">9 Players Tournament</button>
+                        <!-- <button class="btn btn-tournament" onclick="loadTournament(10)">10 Players Tournament</button> -->
+                        <!-- <button class="btn btn-tournament" onclick="loadTournament(11)">11 Players Tournament</button> -->
+                        <!-- <button class="btn btn-tournament" onclick="loadTournament(12)">12 Players Tournament</button> -->
+                        <!-- <button class="btn btn-tournament" onclick="loadTournament(13)">13 Players Tournament</button> -->
+                        <!-- <button class="btn btn-tournament" onclick="loadTournament(14)">14 Players Tournament</button> -->
+                        <!-- <button class="btn btn-tournament" onclick="loadTournament(15)">15 Players Tournament</button> -->
+                        <!-- <button class="btn btn-tournament" onclick="loadTournament(16)">16 Players Tournament</button> -->
                     </div>
                 </div>
                 <div class="info-text">
@@ -65,15 +85,20 @@
             let playerStats = {};
             let tournamentData = null;
 
-            // Load tournament from JSON file
-            async function loadTournament(playerCount) {
+
+            // Load tournament from external data files
+            function loadTournament(playerCount) {
                 try {
-                    const response = await fetch(`base_tournaments/${playerCount}_team_round_robin.json`);
-                    if (!response.ok) {
-                        throw new Error(`Failed to load tournament data: ${response.statusText}`);
+                    // Get tournament data from external JS files
+                    tournamentData = window[`tournamentData${playerCount}`];
+                    if (!tournamentData) {
+                        throw new Error(`Tournament data not found for ${playerCount} players`);
                     }
                     
-                    tournamentData = await response.json();
+                    if (!tournamentData) {
+                        throw new Error(`Tournament data not loaded for ${playerCount} players`);
+                    }
+                    
                     currentPlayerCount = playerCount;
                     matchConfigs = tournamentData.tournamentStructure;
                     

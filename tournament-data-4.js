@@ -1,0 +1,58 @@
+// Tournament data for 4 players
+window.tournamentData4 = {
+    "version": "3.0",
+    "timestamp": "2025-09-04T18:00:00.695Z",
+    "playerCount": 4,
+    "players": {
+        "1": "Player 1",
+        "2": "Player 2",
+        "3": "Player 3",
+        "4": "Player 4"
+    },
+    "tournamentStructure": [
+        [
+            [
+                [2, 3],
+                [1, 4]
+            ]
+        ],
+        [
+            [
+                [2, 4],
+                [1, 3]
+            ]
+        ],
+        [
+            [
+                [3, 4],
+                [1, 2]
+            ]
+        ]
+    ],
+    "scores": [
+        {
+            "round": 1,
+            "match": 1,
+            "team1": [2, 3],
+            "team2": [1, 4],
+            "team1Score": "",
+            "team2Score": ""
+        },
+        {
+            "round": 2,
+            "match": 1,
+            "team1": [2, 4],
+            "team2": [1, 3],
+            "team1Score": "",
+            "team2Score": ""
+        },
+        {
+            "round": 3,
+            "match": 1,
+            "team1": [3, 4],
+            "team2": [1, 2],
+            "team1Score": "",
+            "team2Score": ""
+        }
+    ]
+};
