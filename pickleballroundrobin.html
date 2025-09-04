@@ -22,12 +22,15 @@
             <div class="player-count-section">
                 <h3>Tournament Setup</h3>
                 <div class="player-count-input">
-                    <label for="playerCount">Number of Players:</label>
-                    <input type="number" id="playerCount" min="4" max="16" value="8" onchange="generateTournament()" />
-                    <button class="btn btn-generate" onclick="generateTournament()">🔄 Generate Tournament</button>
+                    <label>Select Tournament Format:</label>
+                    <div class="tournament-options">
+                        <button class="btn btn-tournament" onclick="loadTournament(4)">4 Players Tournament</button>
+                        <button class="btn btn-tournament" onclick="loadTournament(5)">5 Players Tournament</button>
+                    </div>
                 </div>
                 <div class="info-text">
-                    Tournament will have <span id="roundsCount">7</span> rounds with <span id="matchesPerRound">4</span> matches per round
+                    Tournament will have <span id="roundsCount">3</span> rounds with <span id="matchesPerRound">1</span> matches per round
+                    <br><span id="byeInfo">No bye weeks</span>
                 </div>
             </div>
 
@@ -57,165 +60,54 @@
         <div id="toast" class="toast"></div>
 
         <script>
-            let currentPlayerCount = 8;
+            let currentPlayerCount = 4;
             let matchConfigs = [];
             let playerStats = {};
+            let tournamentData = null;
 
-            // Generate round robin schedule for doubles where each player plays with and against every other player exactly once
-            function generateRoundRobinSchedule(numPlayers) {
-                const schedule = [];
-                
-                // For doubles, we need an even number of players
-                if (numPlayers % 2 !== 0) {
-                    showToast('For doubles matches, please use an even number of players', true);
-                    return [];
-                }
-
-                // Create all possible partnerships
-                const allPartnerships = [];
-                for (let i = 1; i <= numPlayers; i++) {
-                    for (let j = i + 1; j <= numPlayers; j++) {
-                        allPartnerships.push([i, j]);
-                    }
-                }
-                
-                // Shuffle partnerships for variety between attempts
-                for (let i = allPartnerships.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [allPartnerships[i], allPartnerships[j]] = [allPartnerships[j], allPartnerships[i]];
-                }
-                
-                // Track used partnerships to prevent duplicates
-                const usedPartnerships = new Set();
-                const rounds = numPlayers - 1;
-                
-                for (let round = 0; round < rounds; round++) {
-                    const roundMatches = [];
-                    const usedPlayers = new Set();
-                    const availablePartnerships = allPartnerships.filter(p => !usedPartnerships.has(`${p[0]}-${p[1]}`));
-                    
-                    // Try to create matches for this round
-                    while (availablePartnerships.length > 0 && usedPlayers.size < numPlayers) {
-                        let foundMatch = false;
-                        
-                        // Try to find two partnerships that don't share players
-                        for (let i = 0; i < availablePartnerships.length; i++) {
-                            const partnership1 = availablePartnerships[i];
-                            
-                            // Check if partnership1 players are already used in this round
-                            const partnership1Used = partnership1.some(player => usedPlayers.has(player));
-                            
-                            if (!partnership1Used) {
-                                // Find a second partnership that doesn't share any players with partnership1
-                                for (let j = i + 1; j < availablePartnerships.length; j++) {
-                                    const partnership2 = availablePartnerships[j];
-                                    
-                                    // Check if partnership2 players are already used in this round
-                                    const partnership2Used = partnership2.some(player => usedPlayers.has(player));
-                                    
-                                    // Check if partnerships share any players
-                                    const sharesPlayers = partnership1.some(player => partnership2.includes(player));
-                                    
-                                    if (!partnership2Used && !sharesPlayers) {
-                                        // Found a valid match
-                                        roundMatches.push([partnership1, partnership2]);
-                                        
-                                        // Mark players as used
-                                        [...partnership1, ...partnership2].forEach(player => usedPlayers.add(player));
-                                        
-                                        // Mark partnerships as used
-                                        usedPartnerships.add(`${partnership1[0]}-${partnership1[1]}`);
-                                        usedPartnerships.add(`${partnership2[0]}-${partnership2[1]}`);
-                                        
-                                        // Remove used partnerships from available list
-                                        availablePartnerships.splice(j, 1);
-                                        availablePartnerships.splice(i, 1);
-                                        foundMatch = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            
-                            if (foundMatch) break;
-                        }
-                        
-                        if (!foundMatch) {
-                            // Can't create more matches for this round
-                            break;
-                        }
+            // Load tournament from JSON file
+            async function loadTournament(playerCount) {
+                try {
+                    const response = await fetch(`base_tournaments/${playerCount}_team_round_robin.json`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load tournament data: ${response.statusText}`);
                     }
                     
-                    // Check if we used all players in this round
-                    if (usedPlayers.size !== numPlayers) {
-                        showToast('Could not generate a perfect tournament. Please try again.', true);
-                        return [];
+                    tournamentData = await response.json();
+                    currentPlayerCount = playerCount;
+                    matchConfigs = tournamentData.tournamentStructure;
+                    
+                    // Update info text
+                    const roundsCount = matchConfigs.length;
+                    const matchesPerRound = Math.floor(playerCount / 4);
+                    const playersOnBye = playerCount % 4;
+                    document.getElementById('roundsCount').textContent = roundsCount;
+                    document.getElementById('matchesPerRound').textContent = matchesPerRound;
+                    
+                    // Update bye info
+                    const byeInfoElement = document.getElementById('byeInfo');
+                    if (playersOnBye > 0) {
+                        byeInfoElement.textContent = `${playersOnBye} player(s) on bye each round`;
+                    } else {
+                        byeInfoElement.textContent = 'No bye weeks';
                     }
                     
-                    if (roundMatches.length > 0) {
-                        schedule.push(roundMatches);
-                    }
+                    generatePlayerInputs();
+                    generateTournamentRounds();
+                    generateSummarySection();
+                    
+                    // Clear existing data
+                    clearScores();
+                    updatePlayerDisplays();
+                    updateStats();
+                    
+                    showToast(`${playerCount} player tournament loaded successfully!`);
+                } catch (error) {
+                    console.error('Error loading tournament:', error);
+                    showToast('Error loading tournament data. Please try again.', true);
                 }
-                
-                return schedule;
             }
 
-            // Generate tournament structure
-            function generateTournament() {
-                const playerCount = parseInt(document.getElementById('playerCount').value);
-                if (playerCount < 4 || playerCount > 16) {
-                    showToast('Please enter a number between 4 and 16 players', true);
-                    return;
-                }
-
-                if (playerCount % 2 !== 0) {
-                    showToast('For doubles matches, please use an even number of players', true);
-                    return;
-                }
-
-                currentPlayerCount = playerCount;
-                
-                // Try to generate tournament, with automatic rerun if it fails
-                let attempts = 0;
-                const maxReruns = 10;
-                
-                do {
-                    attempts++;
-                    matchConfigs = generateRoundRobinSchedule(playerCount);
-                    
-                    // If we got 0 rounds, try again
-                    if (matchConfigs.length === 0) {
-                        console.log(`Tournament generation failed, attempt ${attempts}/${maxReruns}`);
-                        if (attempts < maxReruns) {
-                            showToast(`Generating tournament... (attempt ${attempts + 1}/${maxReruns})`);
-                            continue;
-                        } else {
-                            showToast('Could not generate a valid tournament after multiple attempts. Please try again.', true);
-                            return;
-                        }
-                    }
-                } while (matchConfigs.length === 0 && attempts < maxReruns);
-
-                // Update info text
-                const roundsCount = matchConfigs.length;
-                const matchesPerRound = Math.floor(playerCount / 4); // 4 players per match
-                document.getElementById('roundsCount').textContent = roundsCount;
-                document.getElementById('matchesPerRound').textContent = matchesPerRound;
-
-                generatePlayerInputs();
-                generateTournamentRounds();
-                generateSummarySection();
-
-                // Clear existing data
-                clearScores();
-                updatePlayerDisplays();
-                updateStats();
-
-                if (attempts > 1) {
-                    showToast(`Doubles tournament generated for ${playerCount} players! (took ${attempts} attempts)`);
-                } else {
-                    showToast(`Doubles tournament generated for ${playerCount} players!`);
-                }
-            }
 
             // Generate player input fields
             function generatePlayerInputs() {
@@ -257,24 +149,50 @@
                     round.forEach((match, matchIndex) => {
                         const matchDiv = document.createElement('div');
                         matchDiv.className = 'match';
-                        matchDiv.innerHTML = `
-                            <h4>Court ${String.fromCharCode(65 + matchIndex)}</h4>
-                            <div class="team">
-                                <span class="team-names">
-                                    <span class="player-display" data-players="${match[0][0]},${match[0][1]}"></span>
-                                </span>
-                                <input type="number" class="score-input" placeholder="Score" />
-                            </div>
-                            <div class="vs">VS</div>
-                            <div class="team">
-                                <span class="team-names">
-                                    <span class="player-display" data-players="${match[1][0]},${match[1][1]}"></span>
-                                </span>
-                                <input type="number" class="score-input" placeholder="Score" />
-                            </div>
-                        `;
+                        
+                        // Check if this is a bye week (from JSON structure)
+                        if (match.type === 'bye') {
+                            matchDiv.innerHTML = `
+                                <h4>Bye Week</h4>
+                                <div class="bye-players">
+                                    <span class="bye-display" data-players="${match.players.join(',')}"></span>
+                                </div>
+                            `;
+                            matchDiv.classList.add('bye-match');
+                        } else {
+                            matchDiv.innerHTML = `
+                                <h4>Court ${String.fromCharCode(65 + matchIndex)}</h4>
+                                <div class="team">
+                                    <span class="team-names">
+                                        <span class="player-display" data-players="${match[0][0]},${match[0][1]}"></span>
+                                    </span>
+                                    <input type="number" class="score-input" placeholder="Score" />
+                                </div>
+                                <div class="vs">VS</div>
+                                <div class="team">
+                                    <span class="team-names">
+                                        <span class="player-display" data-players="${match[1][0]},${match[1][1]}"></span>
+                                    </span>
+                                    <input type="number" class="score-input" placeholder="Score" />
+                                </div>
+                            `;
+                        }
                         matchesDiv.appendChild(matchDiv);
                     });
+                    
+                    // Add bye week display if tournament has bye data
+                    if (tournamentData && tournamentData.byes && tournamentData.byes[roundIndex] !== undefined) {
+                        const byePlayer = tournamentData.byes[roundIndex];
+                        const byeDiv = document.createElement('div');
+                        byeDiv.className = 'match bye-match';
+                        byeDiv.innerHTML = `
+                            <h4>Bye Week</h4>
+                            <div class="bye-players">
+                                <span class="bye-display" data-players="${byePlayer}"></span>
+                            </div>
+                        `;
+                        matchesDiv.appendChild(byeDiv);
+                    }
 
                     roundDiv.appendChild(matchesDiv);
                     tournamentRounds.appendChild(roundDiv);
@@ -327,7 +245,7 @@
 
             // Export tournament data
             function exportData() {
-                const tournamentData = {
+                const exportData = {
                     version: '3.0',
                     timestamp: new Date().toISOString(),
                     playerCount: currentPlayerCount,
@@ -335,11 +253,16 @@
                     tournamentStructure: matchConfigs,
                     scores: [],
                 };
+                
+                // Include bye data if it exists
+                if (tournamentData && tournamentData.byes) {
+                    exportData.byes = tournamentData.byes;
+                }
 
                 // Export player names
                 for (let i = 1; i <= currentPlayerCount; i++) {
                     const input = document.getElementById(`player${i}`);
-                    tournamentData.players[i] = input ? input.value || `Player ${i}` : `Player ${i}`;
+                    exportData.players[i] = input ? input.value || `Player ${i}` : `Player ${i}`;
                 }
 
                 // Export scores with match structure
@@ -347,24 +270,39 @@
                 let scoreIndex = 0;
                 matchConfigs.forEach((round, roundIndex) => {
                     round.forEach((match, matchIndex) => {
-                        const team1Score = scoreInputs[scoreIndex] ? scoreInputs[scoreIndex].value || '' : '';
-                        const team2Score = scoreInputs[scoreIndex + 1] ? scoreInputs[scoreIndex + 1].value || '' : '';
-                        
-                        tournamentData.scores.push({
-                            round: roundIndex + 1,
-                            match: matchIndex + 1,
-                            team1: match[0],
-                            team2: match[1],
-                            team1Score: team1Score,
-                            team2Score: team2Score
-                        });
-                        
-                        scoreIndex += 2;
+                        if (match.type === 'bye') {
+                            exportData.scores.push({
+                                round: roundIndex + 1,
+                                match: matchIndex + 1,
+                                type: 'bye',
+                                players: match.players
+                            });
+                        } else {
+                            const team1Score = scoreInputs[scoreIndex] ? scoreInputs[scoreIndex].value || '' : '';
+                            const team2Score = scoreInputs[scoreIndex + 1] ? scoreInputs[scoreIndex + 1].value || '' : '';
+                            
+                            const scoreEntry = {
+                                round: roundIndex + 1,
+                                match: matchIndex + 1,
+                                team1: match[0],
+                                team2: match[1],
+                                team1Score: team1Score,
+                                team2Score: team2Score
+                            };
+                            
+                            // Add bye information if it exists
+                            if (tournamentData && tournamentData.byes && tournamentData.byes[roundIndex] !== undefined) {
+                                scoreEntry.bye = tournamentData.byes[roundIndex];
+                            }
+                            
+                            exportData.scores.push(scoreEntry);
+                            scoreIndex += 2;
+                        }
                     });
                 });
 
                 // Create and download file
-                const dataStr = JSON.stringify(tournamentData, null, 2);
+                const dataStr = JSON.stringify(exportData, null, 2);
                 const dataBlob = new Blob([dataStr], { type: 'application/json' });
                 const url = URL.createObjectURL(dataBlob);
 
@@ -394,11 +332,9 @@
                             throw new Error('Invalid tournament data format');
                         }
 
-                        // Set player count and regenerate tournament
+                        // Set player count and load tournament
                         if (tournamentData.playerCount) {
-                            document.getElementById('playerCount').value = tournamentData.playerCount;
-                            
-                            // If we have tournament structure, use it; otherwise generate new one
+                            // Load the tournament structure
                             if (tournamentData.tournamentStructure) {
                                 currentPlayerCount = tournamentData.playerCount;
                                 matchConfigs = tournamentData.tournamentStructure;
@@ -406,14 +342,24 @@
                                 // Update info text
                                 const roundsCount = matchConfigs.length;
                                 const matchesPerRound = Math.floor(tournamentData.playerCount / 4);
+                                const playersOnBye = tournamentData.playerCount % 4;
                                 document.getElementById('roundsCount').textContent = roundsCount;
                                 document.getElementById('matchesPerRound').textContent = matchesPerRound;
+                                
+                                // Update bye info
+                                const byeInfoElement = document.getElementById('byeInfo');
+                                if (playersOnBye > 0) {
+                                    byeInfoElement.textContent = `${playersOnBye} player(s) on bye each round`;
+                                } else {
+                                    byeInfoElement.textContent = 'No bye weeks';
+                                }
 
                                 generatePlayerInputs();
                                 generateTournamentRounds();
                                 generateSummarySection();
                             } else {
-                                generateTournament();
+                                showToast('Invalid tournament data format', true);
+                                return;
                             }
                         }
 
@@ -433,6 +379,11 @@
                                 let scoreIndex = 0;
                                 
                                 tournamentData.scores.forEach((scoreData) => {
+                                    if (scoreData.type === 'bye') {
+                                        // Skip bye weeks - no scores to import
+                                        return;
+                                    }
+                                    
                                     if (scoreIndex < scoreInputs.length) {
                                         scoreInputs[scoreIndex].value = scoreData.team1Score || '';
                                         scoreInputs[scoreIndex + 1].value = scoreData.team2Score || '';
@@ -448,6 +399,11 @@
                                     }
                                 });
                             }
+                        }
+                        
+                        // Import bye data if it exists
+                        if (tournamentData.byes) {
+                            // Bye data is already loaded from the tournament structure
                         }
 
                         // Update displays
@@ -500,6 +456,13 @@
                     display.textContent = playerNames.join(' & ');
                 });
 
+                // Update bye week displays
+                document.querySelectorAll('.bye-display').forEach((display) => {
+                    const playerNumbers = display.getAttribute('data-players').split(',');
+                    const playerNames = playerNumbers.map((num) => players[parseInt(num)]);
+                    display.textContent = `Players on bye: ${playerNames.join(', ')}`;
+                });
+
                 // Update summary section player names
                 for (let i = 1; i <= currentPlayerCount; i++) {
                     const summaryElement = document.getElementById(`summary-${i}`);
@@ -526,8 +489,13 @@
 
                 // Process each match
                 let scoreIndex = 0;
-                matchConfigs.forEach((round) => {
+                matchConfigs.forEach((round, roundIndex) => {
                     round.forEach((match) => {
+                        // Skip bye weeks - no points or wins for players on bye
+                        if (match.type === 'bye') {
+                            return;
+                        }
+
                         const team1Score = parseInt(scoreInputs[scoreIndex].value) || 0;
                         const team2Score = parseInt(scoreInputs[scoreIndex + 1].value) || 0;
                         scoreIndex += 2;
@@ -551,6 +519,11 @@
                             });
                         }
                     });
+                    
+                    // Handle bye weeks from JSON structure
+                    if (tournamentData && tournamentData.byes && tournamentData.byes[roundIndex] !== undefined) {
+                        // Player on bye gets no points or wins (already handled by not being in matches)
+                    }
                 });
 
                 // Sort players by wins (descending), then by points (descending) as tie-breaker
@@ -619,7 +592,7 @@
 
             // Initialize tournament on page load
             window.onload = function () {
-                generateTournament();
+                loadTournament(4); // Load 4-player tournament by default
             };
         </script>
     </body>

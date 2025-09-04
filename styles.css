@@ -73,6 +73,25 @@ h1 {
     background-color: #5a32a3;
 }
 
+.btn-tournament {
+    background-color: #17a2b8;
+    color: white;
+    margin: 5px;
+    min-width: 150px;
+}
+
+.btn-tournament:hover {
+    background-color: #138496;
+}
+
+.tournament-options {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
 .file-input {
     display: none;
 }
@@ -238,6 +257,29 @@ h1 {
 .player-display {
     color: #2c5aa0;
     font-weight: bold;
+}
+
+.bye-match {
+    background-color: #e3f2fd !important;
+    border-color: #2196f3 !important;
+}
+
+.bye-match h4 {
+    color: #1976d2 !important;
+}
+
+.bye-players {
+    text-align: center;
+    padding: 15px;
+    background-color: white;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+}
+
+.bye-display {
+    color: #1976d2;
+    font-weight: bold;
+    font-style: italic;
 }
 
 .summary-section {
