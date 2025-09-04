@@ -4,378 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Pickleball Tournament - Dynamic Round Robin</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 20px;
-                background-color: #f5f5f5;
-            }
-
-            .container {
-                background-color: white;
-                padding: 20px;
-                border-radius: 10px;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-                max-width: 1400px;
-                margin: 0 auto;
-            }
-
-            h1 {
-                text-align: center;
-                color: #2c5aa0;
-                margin-bottom: 30px;
-            }
-
-            .controls {
-                display: flex;
-                justify-content: center;
-                gap: 15px;
-                margin-bottom: 30px;
-                flex-wrap: wrap;
-            }
-
-            .btn {
-                padding: 10px 20px;
-                border: none;
-                border-radius: 5px;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: bold;
-                transition: all 0.3s ease;
-            }
-
-            .btn-export {
-                background-color: #28a745;
-                color: white;
-            }
-
-            .btn-export:hover {
-                background-color: #218838;
-            }
-
-            .btn-import {
-                background-color: #007bff;
-                color: white;
-            }
-
-            .btn-import:hover {
-                background-color: #0056b3;
-            }
-
-            .btn-clear {
-                background-color: #dc3545;
-                color: white;
-            }
-
-            .btn-clear:hover {
-                background-color: #c82333;
-            }
-
-            .btn-generate {
-                background-color: #6f42c1;
-                color: white;
-            }
-
-            .btn-generate:hover {
-                background-color: #5a32a3;
-            }
-
-            .file-input {
-                display: none;
-            }
-
-            .player-count-section {
-                margin-bottom: 30px;
-                background-color: #e9ecef;
-                padding: 20px;
-                border-radius: 8px;
-                text-align: center;
-            }
-
-            .player-count-section h3 {
-                color: #2c5aa0;
-                margin-bottom: 15px;
-            }
-
-            .player-count-input {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
-                flex-wrap: wrap;
-            }
-
-            .player-count-input input {
-                padding: 8px 12px;
-                border: 2px solid #ddd;
-                border-radius: 5px;
-                font-size: 16px;
-                text-align: center;
-                width: 80px;
-            }
-
-            .player-count-input input:focus {
-                border-color: #2c5aa0;
-                outline: none;
-            }
-
-            .player-section {
-                margin-bottom: 30px;
-                background-color: #f8f9fa;
-                padding: 15px;
-                border-radius: 8px;
-            }
-
-            .player-section h3 {
-                color: #2c5aa0;
-                margin-bottom: 15px;
-            }
-
-            .player-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 10px;
-                max-width: 100%;
-            }
-
-            .player-input {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                min-width: 0;
-                width: 100%;
-            }
-
-            .player-input label {
-                font-weight: bold;
-                margin-bottom: 5px;
-                color: #555;
-                text-align: center;
-                word-wrap: break-word;
-                max-width: 100%;
-            }
-
-            .player-input input {
-                padding: 8px;
-                border: 2px solid #ddd;
-                border-radius: 5px;
-                font-size: 14px;
-                text-align: center;
-                width: 120px;
-                max-width: 100%;
-                word-wrap: break-word;
-                white-space: normal;
-                min-height: 20px;
-                resize: none;
-                overflow-wrap: break-word;
-            }
-
-            .player-input input:focus {
-                border-color: #2c5aa0;
-                outline: none;
-            }
-
-            .round {
-                margin-bottom: 40px;
-                border: 2px solid #2c5aa0;
-                border-radius: 10px;
-                padding: 20px;
-                background-color: white;
-            }
-
-            .round h3 {
-                color: #2c5aa0;
-                text-align: center;
-                margin-bottom: 20px;
-                font-size: 1.4em;
-            }
-
-            .matches {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-                gap: 30px;
-            }
-
-            .match {
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                padding: 15px;
-                background-color: #f8f9fa;
-            }
-
-            .match h4 {
-                text-align: center;
-                color: #2c5aa0;
-                margin-bottom: 15px;
-            }
-
-            .team {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                margin-bottom: 10px;
-                padding: 10px;
-                background-color: white;
-                border-radius: 5px;
-                border: 1px solid #e0e0e0;
-            }
-
-            .team-names {
-                font-weight: bold;
-                color: #333;
-                flex: 1;
-            }
-
-            .score-input {
-                width: 50px;
-                padding: 5px;
-                text-align: center;
-                border: 1px solid #ccc;
-                border-radius: 3px;
-                margin-left: 10px;
-            }
-
-            .vs {
-                text-align: center;
-                font-weight: bold;
-                color: #666;
-                margin: 10px 0;
-            }
-
-            .player-display {
-                color: #2c5aa0;
-                font-weight: bold;
-            }
-
-            .summary-section {
-                margin-top: 40px;
-                background-color: #f8f9fa;
-                padding: 20px;
-                border-radius: 10px;
-                border: 2px solid #2c5aa0;
-            }
-
-            .summary-section h3 {
-                color: #2c5aa0;
-                text-align: center;
-                margin-bottom: 20px;
-            }
-
-            .summary-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 15px;
-            }
-
-            .summary-item {
-                background-color: white;
-                padding: 15px;
-                border-radius: 8px;
-                border: 1px solid #ddd;
-                text-align: center;
-                position: relative;
-            }
-
-            .summary-item.winner {
-                background-color: #d4edda;
-                border-color: #28a745;
-                box-shadow: 0 2px 5px rgba(40, 167, 69, 0.3);
-            }
-
-            .summary-item.second {
-                background-color: #fff3cd;
-                border-color: #ffc107;
-                box-shadow: 0 2px 5px rgba(255, 193, 7, 0.3);
-            }
-
-            .summary-item.third {
-                background-color: #f8d7da;
-                border-color: #dc3545;
-                box-shadow: 0 2px 5px rgba(220, 53, 69, 0.3);
-            }
-
-            .rank-badge {
-                position: absolute;
-                top: -8px;
-                right: -8px;
-                background-color: #2c5aa0;
-                color: white;
-                border-radius: 50%;
-                width: 24px;
-                height: 24px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 12px;
-                font-weight: bold;
-            }
-
-            .rank-badge.first {
-                background-color: #ffd700;
-                color: #000;
-            }
-
-            .rank-badge.second {
-                background-color: #c0c0c0;
-                color: #000;
-            }
-
-            .rank-badge.third {
-                background-color: #cd7f32;
-                color: #fff;
-            }
-
-            .player-name {
-                font-weight: bold;
-                color: #2c5aa0;
-                margin-bottom: 5px;
-            }
-
-            .wins,
-            .points {
-                font-size: 14px;
-                color: #666;
-                margin: 2px 0;
-            }
-
-            .rank {
-                font-size: 12px;
-                color: #888;
-                margin-top: 5px;
-                font-style: italic;
-            }
-
-            .toast {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background-color: #28a745;
-                color: white;
-                padding: 15px 20px;
-                border-radius: 5px;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-                z-index: 1000;
-                opacity: 0;
-                transform: translateX(100%);
-                transition: all 0.3s ease;
-            }
-
-            .toast.show {
-                opacity: 1;
-                transform: translateX(0);
-            }
-
-            .toast.error {
-                background-color: #dc3545;
-            }
-
-            .info-text {
-                color: #666;
-                font-size: 14px;
-                margin-top: 10px;
-                text-align: center;
-            }
-        </style>
+        <link rel="stylesheet" href="styles.css">
     </head>
     <body>
         <div class="container">
@@ -432,119 +61,95 @@
             let matchConfigs = [];
             let playerStats = {};
 
-            // Generate round robin schedule for doubles with unique team pairings
+            // Generate round robin schedule for doubles where each player plays with and against every other player exactly once
             function generateRoundRobinSchedule(numPlayers) {
                 const schedule = [];
-
+                
                 // For doubles, we need an even number of players
                 if (numPlayers % 2 !== 0) {
                     showToast('For doubles matches, please use an even number of players', true);
                     return [];
                 }
 
-                const players = Array.from({ length: numPlayers }, (_, i) => i + 1);
-                const rounds = numPlayers - 1; // Each player plays with every other player once
-                const usedTeams = new Set(); // Track all used team pairings across all rounds
-
+                // Create all possible partnerships
+                const allPartnerships = [];
+                for (let i = 1; i <= numPlayers; i++) {
+                    for (let j = i + 1; j <= numPlayers; j++) {
+                        allPartnerships.push([i, j]);
+                    }
+                }
+                
+                // Track used partnerships to prevent duplicates
+                const usedPartnerships = new Set();
+                const rounds = numPlayers - 1;
+                
                 for (let round = 0; round < rounds; round++) {
                     const roundMatches = [];
                     const usedPlayers = new Set();
-
-                    // Create matches for this round
-                    for (let i = 0; i < numPlayers / 2; i++) {
-                        // Find two unused players for team 1
-                        let team1 = [];
-                        for (let j = 0; j < players.length && team1.length < 2; j++) {
-                            if (!usedPlayers.has(players[j])) {
-                                team1.push(players[j]);
-                            }
-                        }
-
-                        // Check if this team has been used before
-                        const team1Key = `${Math.min(team1[0], team1[1])}-${Math.max(team1[0], team1[1])}`;
-                        if (usedTeams.has(team1Key)) {
-                            // Try to find a different combination for team 1
-                            let foundValidTeam1 = false;
-                            for (let k = 0; k < players.length && !foundValidTeam1; k++) {
-                                for (let l = k + 1; l < players.length && !foundValidTeam1; l++) {
-                                    if (!usedPlayers.has(players[k]) && !usedPlayers.has(players[l])) {
-                                        const testTeam1 = [players[k], players[l]];
-                                        const testTeam1Key = `${Math.min(testTeam1[0], testTeam1[1])}-${Math.max(testTeam1[0], testTeam1[1])}`;
-                                        if (!usedTeams.has(testTeam1Key)) {
-                                            team1 = testTeam1;
-                                            foundValidTeam1 = true;
-                                        }
+                    const availablePartnerships = allPartnerships.filter(p => !usedPartnerships.has(`${p[0]}-${p[1]}`));
+                    
+                    // Try to create matches for this round
+                    while (availablePartnerships.length > 0 && usedPlayers.size < numPlayers) {
+                        let foundMatch = false;
+                        
+                        // Try to find two partnerships that don't share players
+                        for (let i = 0; i < availablePartnerships.length; i++) {
+                            const partnership1 = availablePartnerships[i];
+                            
+                            // Check if partnership1 players are already used in this round
+                            const partnership1Used = partnership1.some(player => usedPlayers.has(player));
+                            
+                            if (!partnership1Used) {
+                                // Find a second partnership that doesn't share any players with partnership1
+                                for (let j = i + 1; j < availablePartnerships.length; j++) {
+                                    const partnership2 = availablePartnerships[j];
+                                    
+                                    // Check if partnership2 players are already used in this round
+                                    const partnership2Used = partnership2.some(player => usedPlayers.has(player));
+                                    
+                                    // Check if partnerships share any players
+                                    const sharesPlayers = partnership1.some(player => partnership2.includes(player));
+                                    
+                                    if (!partnership2Used && !sharesPlayers) {
+                                        // Found a valid match
+                                        roundMatches.push([partnership1, partnership2]);
+                                        
+                                        // Mark players as used
+                                        [...partnership1, ...partnership2].forEach(player => usedPlayers.add(player));
+                                        
+                                        // Mark partnerships as used
+                                        usedPartnerships.add(`${partnership1[0]}-${partnership1[1]}`);
+                                        usedPartnerships.add(`${partnership2[0]}-${partnership2[1]}`);
+                                        
+                                        // Remove used partnerships from available list
+                                        availablePartnerships.splice(j, 1);
+                                        availablePartnerships.splice(i, 1);
+                                        foundMatch = true;
+                                        break;
                                     }
                                 }
                             }
-                            if (!foundValidTeam1) continue; // Skip this match if we can't find a valid team 1
+                            
+                            if (foundMatch) break;
                         }
-
-                        // Find two unused players for team 2
-                        let team2 = [];
-                        for (let j = 0; j < players.length && team2.length < 2; j++) {
-                            if (!usedPlayers.has(players[j]) && !team1.includes(players[j])) {
-                                team2.push(players[j]);
-                            }
-                        }
-
-                        // Check if team 2 has been used before
-                        if (team2.length === 2) {
-                            const team2Key = `${Math.min(team2[0], team2[1])}-${Math.max(team2[0], team2[1])}`;
-                            if (usedTeams.has(team2Key)) {
-                                // Try to find a different combination for team 2
-                                let foundValidTeam2 = false;
-                                for (let k = 0; k < players.length && !foundValidTeam2; k++) {
-                                    for (let l = k + 1; l < players.length && !foundValidTeam2; l++) {
-                                        if (
-                                            !usedPlayers.has(players[k]) &&
-                                            !usedPlayers.has(players[l]) &&
-                                            !team1.includes(players[k]) &&
-                                            !team1.includes(players[l])
-                                        ) {
-                                            const testTeam2 = [players[k], players[l]];
-                                            const testTeam2Key = `${Math.min(testTeam2[0], testTeam2[1])}-${Math.max(testTeam2[0], testTeam2[1])}`;
-                                            if (!usedTeams.has(testTeam2Key)) {
-                                                team2 = testTeam2;
-                                                foundValidTeam2 = true;
-                                            }
-                                        }
-                                    }
-                                }
-                                if (!foundValidTeam2) continue; // Skip this match if we can't find a valid team 2
-                            }
-                        }
-
-                        if (team1.length === 2 && team2.length === 2) {
-                            roundMatches.push([team1, team2]);
-
-                            // Mark teams as used
-                            const team1Key = `${Math.min(team1[0], team1[1])}-${Math.max(team1[0], team1[1])}`;
-                            const team2Key = `${Math.min(team2[0], team2[1])}-${Math.max(team2[0], team2[1])}`;
-                            usedTeams.add(team1Key);
-                            usedTeams.add(team2Key);
-
-                            // Mark players as used this round
-                            usedPlayers.add(team1[0]);
-                            usedPlayers.add(team1[1]);
-                            usedPlayers.add(team2[0]);
-                            usedPlayers.add(team2[1]);
+                        
+                        if (!foundMatch) {
+                            // Can't create more matches for this round
+                            break;
                         }
                     }
-
+                    
+                    // Check if we used all players in this round
+                    if (usedPlayers.size !== numPlayers) {
+                        showToast('Could not generate a perfect tournament. Please try again.', true);
+                        return [];
+                    }
+                    
                     if (roundMatches.length > 0) {
                         schedule.push(roundMatches);
                     }
-
-                    // Rotate players (except the first one) - this ensures each player plays with every other player
-                    const first = players[0];
-                    const last = players[numPlayers - 1];
-                    for (let i = numPlayers - 1; i > 1; i--) {
-                        players[i] = players[i - 1];
-                    }
-                    players[1] = last;
                 }
-
+                
                 return schedule;
             }
 
