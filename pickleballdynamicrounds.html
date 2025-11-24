@@ -1,0 +1,955 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Pickleball Tournament - Dynamic Round Generation</title>
+        <link rel="stylesheet" href="styles.css">
+        <script src="fixed_dynamic_tournaments/tournament-structure-8.js"></script>
+        <script src="fixed_dynamic_tournaments/tournament-structure-12.js"></script>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🏓 Pickleball Tournament - Dynamic Round Generation</h1>
+
+            <!-- Control Buttons -->
+            <div class="controls">
+                <button class="btn btn-export" onclick="exportData()">📤 Export Tournament Data</button>
+                <button class="btn btn-import" onclick="document.getElementById('fileInput').click()">📥 Import Tournament Data</button>
+                <button class="btn btn-clear" onclick="clearAllData()">🗑️ Clear All Data</button>
+                <input type="file" id="fileInput" class="file-input" accept=".json" onchange="importData(event)" />
+            </div>
+
+            <!-- Player Count Section -->
+            <div class="player-count-section">
+                <h3>Tournament Setup</h3>
+                <div class="player-count-input">
+                    <label>Select Tournament Format:</label>
+                    <div class="tournament-options">
+                        <button class="btn btn-tournament" onclick="initializeTournament(8)">8 Players Tournament</button>
+                        <button class="btn btn-tournament" onclick="initializeTournament(12)">12 Players Tournament</button>
+                    </div>
+                </div>
+                <div class="info-text">
+                    Tournament will have <span id="roundsCount">0</span> rounds generated
+                    <br><span id="maxRoundsInfo">Maximum rounds: 0 (each player plays with each other player once)</span>
+                </div>
+            </div>
+
+            <!-- Player Names Section -->
+            <div class="player-section">
+                <h3>Player Names</h3>
+                <div class="player-grid" id="playerGrid">
+                    <!-- Player inputs will be generated dynamically -->
+                </div>
+            </div>
+
+            <!-- Tournament Rounds -->
+            <div id="tournamentRounds">
+                <!-- Rounds will be generated dynamically -->
+            </div>
+
+            <!-- Round Controls -->
+            <div class="round-controls" id="roundControls" style="display: none;">
+                <button class="btn btn-generate" onclick="generateNextRound()">🎲 Generate Next Round</button>
+                <span id="roundStatus"></span>
+            </div>
+
+            <!-- Summary Section -->
+            <div class="summary-section">
+                <h3>🏆 Tournament Standings</h3>
+                <div class="summary-grid" id="summaryGrid">
+                    <!-- Summary items will be generated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast notification -->
+        <div id="toast" class="toast"></div>
+
+        <script>
+            let currentPlayerCount = 0;
+            let generatedRounds = []; // Array of rounds, each round is an array of matches
+            let playerStats = {};
+            let teammateHistory = {}; // Track which players have been teammates: {playerId: Set of playerIds}
+            let maxRounds = 0;
+            let fixedTournamentStructure = null; // Pre-defined tournament structure
+
+            // Initialize tournament
+            function initializeTournament(playerCount) {
+                if (playerCount !== 8 && playerCount !== 12) {
+                    showToast('Only 8 and 12 player tournaments are supported', true);
+                    return;
+                }
+
+                currentPlayerCount = playerCount;
+                maxRounds = playerCount - 1; // Each player plays with each other player once
+                generatedRounds = [];
+                teammateHistory = {};
+                playerStats = {};
+
+                // Load fixed tournament structure
+                if (playerCount === 8) {
+                    fixedTournamentStructure = window.fixedTournamentStructure8;
+                } else if (playerCount === 12) {
+                    fixedTournamentStructure = window.fixedTournamentStructure12;
+                }
+
+                if (!fixedTournamentStructure) {
+                    showToast('Fixed tournament structure not found', true);
+                    return;
+                }
+
+                // Initialize teammate history
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    teammateHistory[i] = new Set();
+                    teammateHistory[i].add(i); // Player is always their own teammate (for uniqueness check)
+                }
+
+                // Update info text
+                document.getElementById('roundsCount').textContent = '0';
+                document.getElementById('maxRoundsInfo').textContent = `Maximum rounds: ${maxRounds} (each player plays with each other player once)`;
+
+                // Show round controls
+                document.getElementById('roundControls').style.display = 'block';
+                updateRoundStatus();
+
+                generatePlayerInputs();
+                generateSummarySection();
+                
+                // Generate round 1 by default with a simple pairing
+                generateRound1();
+
+                showToast(`${playerCount} player tournament initialized! Round 1 generated.`);
+            }
+
+            // Generate player input fields
+            function generatePlayerInputs() {
+                const playerGrid = document.getElementById('playerGrid');
+                playerGrid.innerHTML = '';
+
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const playerDiv = document.createElement('div');
+                    playerDiv.className = 'player-input';
+                    playerDiv.innerHTML = `
+                        <label>Player ${i}</label>
+                        <input type="text" id="player${i}" placeholder="Enter name" />
+                    `;
+                    playerGrid.appendChild(playerDiv);
+                }
+
+                // Add event listeners
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const input = document.getElementById(`player${i}`);
+                    if (input) {
+                        input.addEventListener('input', updatePlayerDisplays);
+                    }
+                }
+            }
+
+            // Generate round 1 from fixed tournament structure
+            function generateRound1() {
+                if (!fixedTournamentStructure || fixedTournamentStructure.length === 0) {
+                    showToast('Fixed tournament structure not available', true);
+                    return;
+                }
+
+                // Get the first round from fixed structure
+                const fixedRound = fixedTournamentStructure[0];
+                
+                // Sort teams by total points (descending) before assigning to courts
+                const allTeams = [];
+                fixedRound.forEach(match => {
+                    allTeams.push(match[0]);
+                    allTeams.push(match[1]);
+                });
+
+                const teamsWithPoints = allTeams.map(team => ({
+                    team: team,
+                    totalPoints: getTeamTotalPoints(team)
+                }));
+
+                teamsWithPoints.sort((a, b) => b.totalPoints - a.totalPoints);
+
+                // Create matches by pairing teams (top 2 teams on court 1, next 2 on court 2, etc.)
+                const round = [];
+                const numCourts = Math.floor(currentPlayerCount / 4);
+                
+                for (let i = 0; i < numCourts; i++) {
+                    const team1Index = i * 2;
+                    const team2Index = i * 2 + 1;
+                    
+                    if (team1Index < teamsWithPoints.length && team2Index < teamsWithPoints.length) {
+                        round.push([
+                            teamsWithPoints[team1Index].team,
+                            teamsWithPoints[team2Index].team
+                        ]);
+                    }
+                }
+
+                // Update teammate history
+                round.forEach(match => {
+                    const [team1, team2] = match;
+                    teammateHistory[team1[0]].add(team1[1]);
+                    teammateHistory[team1[1]].add(team1[0]);
+                    teammateHistory[team2[0]].add(team2[1]);
+                    teammateHistory[team2[1]].add(team2[0]);
+                });
+
+                generatedRounds.push(round);
+                renderAllRounds();
+                updateRoundStatus();
+                updateStats();
+            }
+
+            // Generate next round from fixed tournament structure
+            function generateNextRound() {
+                if (generatedRounds.length >= maxRounds) {
+                    showToast('All rounds have been generated!', true);
+                    return;
+                }
+
+                if (!fixedTournamentStructure) {
+                    showToast('Fixed tournament structure not available', true);
+                    return;
+                }
+
+                // Get the next round from fixed structure
+                const roundIndex = generatedRounds.length;
+                if (roundIndex >= fixedTournamentStructure.length) {
+                    showToast('No more rounds available in fixed structure', true);
+                    return;
+                }
+
+                const fixedRound = fixedTournamentStructure[roundIndex];
+                
+                // Sort teams by total points (descending) before assigning to courts
+                const allTeams = [];
+                fixedRound.forEach(match => {
+                    allTeams.push(match[0]);
+                    allTeams.push(match[1]);
+                });
+
+                const teamsWithPoints = allTeams.map(team => ({
+                    team: team,
+                    totalPoints: getTeamTotalPoints(team)
+                }));
+
+                teamsWithPoints.sort((a, b) => b.totalPoints - a.totalPoints);
+
+                // Create matches by pairing teams (top 2 teams on court 1, next 2 on court 2, etc.)
+                const round = [];
+                const numCourts = Math.floor(currentPlayerCount / 4);
+                
+                for (let i = 0; i < numCourts; i++) {
+                    const team1Index = i * 2;
+                    const team2Index = i * 2 + 1;
+                    
+                    if (team1Index < teamsWithPoints.length && team2Index < teamsWithPoints.length) {
+                        round.push([
+                            teamsWithPoints[team1Index].team,
+                            teamsWithPoints[team2Index].team
+                        ]);
+                    }
+                }
+
+                // Update teammate history
+                round.forEach(match => {
+                    const [team1, team2] = match;
+                    // Mark players in team1 as teammates
+                    teammateHistory[team1[0]].add(team1[1]);
+                    teammateHistory[team1[1]].add(team1[0]);
+                    // Mark players in team2 as teammates
+                    teammateHistory[team2[0]].add(team2[1]);
+                    teammateHistory[team2[1]].add(team2[0]);
+                });
+
+                generatedRounds.push(round);
+                renderAllRounds();
+                updateRoundStatus();
+                updateStats();
+
+                showToast(`Round ${generatedRounds.length} generated successfully!`);
+            }
+
+            // Generate all possible unique teams (pairs of players who haven't been teammates)
+            function generateUniqueTeams() {
+                const players = Array.from({length: currentPlayerCount}, (_, i) => i + 1);
+                const availablePairs = [];
+                
+                // Generate all possible pairs that haven't been teammates
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    for (let j = i + 1; j <= currentPlayerCount; j++) {
+                        if (!teammateHistory[i].has(j)) {
+                            availablePairs.push([i, j]);
+                        }
+                    }
+                }
+
+                // Use a matching algorithm to find a valid set of teams
+                // Try multiple times with different orderings to find a valid matching
+                const shuffledPairs = [...availablePairs].sort(() => Math.random() - 0.5);
+                
+                const result = findMatching(shuffledPairs, players);
+                if (result && result.length === players.length / 2) {
+                    return result;
+                }
+
+                // If first attempt fails, try a few more times
+                for (let attempt = 0; attempt < 10; attempt++) {
+                    const shuffled = [...availablePairs].sort(() => Math.random() - 0.5);
+                    const result = findMatching(shuffled, players);
+                    if (result && result.length === players.length / 2) {
+                        return result;
+                    }
+                }
+
+                // If still no solution, use greedy approach
+                return findGreedyMatching(availablePairs, players);
+            }
+
+            // Find a matching using backtracking
+            function findMatching(pairs, players) {
+                const usedPlayers = new Set();
+                const teams = [];
+                
+                function backtrack(index) {
+                    if (usedPlayers.size === players.length) {
+                        return true;
+                    }
+                    
+                    if (index >= pairs.length) {
+                        return false;
+                    }
+                    
+                    const [p1, p2] = pairs[index];
+                    
+                    // Skip if either player is already used
+                    if (usedPlayers.has(p1) || usedPlayers.has(p2)) {
+                        return backtrack(index + 1);
+                    }
+                    
+                    // Try using this pair
+                    usedPlayers.add(p1);
+                    usedPlayers.add(p2);
+                    teams.push([p1, p2]);
+                    
+                    if (backtrack(index + 1)) {
+                        return true;
+                    }
+                    
+                    // Backtrack
+                    teams.pop();
+                    usedPlayers.delete(p1);
+                    usedPlayers.delete(p2);
+                    
+                    // Try skipping this pair
+                    return backtrack(index + 1);
+                }
+                
+                if (backtrack(0)) {
+                    return teams;
+                }
+                
+                return null;
+            }
+
+            // Greedy matching as fallback
+            function findGreedyMatching(pairs, players) {
+                const usedPlayers = new Set();
+                const teams = [];
+                
+                // Shuffle pairs for randomness
+                const shuffled = [...pairs].sort(() => Math.random() - 0.5);
+                
+                for (const [p1, p2] of shuffled) {
+                    if (!usedPlayers.has(p1) && !usedPlayers.has(p2)) {
+                        teams.push([p1, p2]);
+                        usedPlayers.add(p1);
+                        usedPlayers.add(p2);
+                        
+                        if (teams.length === players.length / 2) {
+                            break;
+                        }
+                    }
+                }
+                
+                return teams.length === players.length / 2 ? teams : null;
+            }
+
+            // Get total points for a team (sum of both players' points)
+            function getTeamTotalPoints(team) {
+                const [p1, p2] = team;
+                const points1 = playerStats[p1] ? playerStats[p1].points : 0;
+                const points2 = playerStats[p2] ? playerStats[p2].points : 0;
+                return points1 + points2;
+            }
+
+            // Get team's total points from previous rounds only (up to but not including currentRound)
+            // This is the sum of each player's individual points from previous rounds
+            // savedScores is optional - if provided, use it instead of reading from DOM
+            function getTeamPreviousRoundsPoints(team, currentRound, savedScores = null) {
+                if (currentRound === 0) {
+                    return 0; // No previous rounds for round 1
+                }
+
+                const [p1, p2] = team;
+                let p1Points = 0;
+                let p2Points = 0;
+
+                // Calculate each player's points from all previous rounds (0 to currentRound - 1)
+                for (let roundIdx = 0; roundIdx < currentRound; roundIdx++) {
+                    const round = generatedRounds[roundIdx];
+                    if (!round) continue;
+
+                    round.forEach((match, matchIndex) => {
+                        const [team1, team2] = match;
+                        
+                        // Get scores for this match
+                        let team1Score = 0;
+                        let team2Score = 0;
+                        
+                        if (savedScores) {
+                            const key1 = `${roundIdx}-${matchIndex}-0`;
+                            const key2 = `${roundIdx}-${matchIndex}-1`;
+                            team1Score = parseInt(savedScores[key1]) || 0;
+                            team2Score = parseInt(savedScores[key2]) || 0;
+                        } else {
+                            const scoreInput1 = document.querySelector(
+                                `.score-input[data-round="${roundIdx}"][data-match="${matchIndex}"][data-team="0"]`
+                            );
+                            const scoreInput2 = document.querySelector(
+                                `.score-input[data-round="${roundIdx}"][data-match="${matchIndex}"][data-team="1"]`
+                            );
+                            if (scoreInput1) team1Score = parseInt(scoreInput1.value) || 0;
+                            if (scoreInput2) team2Score = parseInt(scoreInput2.value) || 0;
+                        }
+                        
+                        // Add points to p1 if they were in team1
+                        if (team1[0] === p1 || team1[1] === p1) {
+                            p1Points += team1Score;
+                        }
+                        // Add points to p1 if they were in team2
+                        if (team2[0] === p1 || team2[1] === p1) {
+                            p1Points += team2Score;
+                        }
+                        
+                        // Add points to p2 if they were in team1
+                        if (team1[0] === p2 || team1[1] === p2) {
+                            p2Points += team1Score;
+                        }
+                        // Add points to p2 if they were in team2
+                        if (team2[0] === p2 || team2[1] === p2) {
+                            p2Points += team2Score;
+                        }
+                    });
+                }
+
+                return p1Points + p2Points;
+            }
+
+            // Save current scores before re-rendering
+            function saveScores() {
+                const scores = {};
+                document.querySelectorAll('.score-input').forEach((input) => {
+                    const roundIndex = parseInt(input.getAttribute('data-round'));
+                    const matchIndex = parseInt(input.getAttribute('data-match'));
+                    const teamIndex = parseInt(input.getAttribute('data-team'));
+                    const key = `${roundIndex}-${matchIndex}-${teamIndex}`;
+                    scores[key] = input.value;
+                });
+                return scores;
+            }
+
+            // Restore scores after re-rendering
+            function restoreScores(scores) {
+                if (!scores) return;
+                document.querySelectorAll('.score-input').forEach((input) => {
+                    const roundIndex = parseInt(input.getAttribute('data-round'));
+                    const matchIndex = parseInt(input.getAttribute('data-match'));
+                    const teamIndex = parseInt(input.getAttribute('data-team'));
+                    const key = `${roundIndex}-${matchIndex}-${teamIndex}`;
+                    if (scores[key] !== undefined) {
+                        input.value = scores[key];
+                    }
+                });
+            }
+
+            // Render all generated rounds
+            function renderAllRounds() {
+                // Save existing scores before clearing
+                const savedScores = saveScores();
+
+                const tournamentRounds = document.getElementById('tournamentRounds');
+                tournamentRounds.innerHTML = '';
+
+                generatedRounds.forEach((round, roundIndex) => {
+                    const roundDiv = document.createElement('div');
+                    roundDiv.className = 'round';
+                    roundDiv.innerHTML = `<h3>Round ${roundIndex + 1}</h3>`;
+
+                    const matchesDiv = document.createElement('div');
+                    matchesDiv.className = 'matches';
+
+                    round.forEach((match, matchIndex) => {
+                        const matchDiv = document.createElement('div');
+                        matchDiv.className = 'match';
+                        
+                        // Get saved scores for this match
+                        const team0Key = `${roundIndex}-${matchIndex}-0`;
+                        const team1Key = `${roundIndex}-${matchIndex}-1`;
+                        const team0Score = savedScores[team0Key] || '';
+                        const team1Score = savedScores[team1Key] || '';
+                        
+                        // Calculate previous rounds' points for each team (use saved scores if available)
+                        const team0PreviousPoints = getTeamPreviousRoundsPoints(match[0], roundIndex, savedScores);
+                        const team1PreviousPoints = getTeamPreviousRoundsPoints(match[1], roundIndex, savedScores);
+                        
+                        // Format previous points display (only show if > 0 or if round > 1)
+                        const team0PreviousDisplay = roundIndex > 0 ? `<span class="previous-points">(${team0PreviousPoints} from previous rounds)</span>` : '';
+                        const team1PreviousDisplay = roundIndex > 0 ? `<span class="previous-points">(${team1PreviousPoints} from previous rounds)</span>` : '';
+                        
+                        matchDiv.innerHTML = `
+                            <h4>Court ${String.fromCharCode(65 + matchIndex)}</h4>
+                            <div class="team">
+                                <span class="team-names">
+                                    <span class="player-display" data-players="${match[0][0]},${match[0][1]}"></span>
+                                    ${team0PreviousDisplay}
+                                </span>
+                                <input type="number" class="score-input" data-round="${roundIndex}" data-match="${matchIndex}" data-team="0" placeholder="Score" value="${team0Score}" />
+                            </div>
+                            <div class="vs">VS</div>
+                            <div class="team">
+                                <span class="team-names">
+                                    <span class="player-display" data-players="${match[1][0]},${match[1][1]}"></span>
+                                    ${team1PreviousDisplay}
+                                </span>
+                                <input type="number" class="score-input" data-round="${roundIndex}" data-match="${matchIndex}" data-team="1" placeholder="Score" value="${team1Score}" />
+                            </div>
+                        `;
+                        matchesDiv.appendChild(matchDiv);
+                    });
+
+                    roundDiv.appendChild(matchesDiv);
+                    tournamentRounds.appendChild(roundDiv);
+                });
+
+                // Add event listeners to score inputs
+                document.querySelectorAll('.score-input').forEach((input) => {
+                    input.addEventListener('input', updateStats);
+                });
+
+                // Update player displays
+                updatePlayerDisplays();
+            }
+
+            // Update round status
+            function updateRoundStatus() {
+                const statusElement = document.getElementById('roundStatus');
+                const roundsGenerated = generatedRounds.length;
+                statusElement.textContent = `Rounds generated: ${roundsGenerated} / ${maxRounds}`;
+                
+                document.getElementById('roundsCount').textContent = roundsGenerated;
+
+                // Disable generate button if all rounds are generated
+                const generateBtn = document.querySelector('.btn-generate');
+                if (generateBtn) {
+                    if (roundsGenerated >= maxRounds) {
+                        generateBtn.disabled = true;
+                        generateBtn.textContent = '✅ All Rounds Generated';
+                    } else {
+                        generateBtn.disabled = false;
+                        generateBtn.textContent = '🎲 Generate Next Round';
+                    }
+                }
+            }
+
+            // Generate summary section
+            function generateSummarySection() {
+                const summaryGrid = document.getElementById('summaryGrid');
+                summaryGrid.innerHTML = '';
+
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const summaryDiv = document.createElement('div');
+                    summaryDiv.className = 'summary-item';
+                    summaryDiv.id = `summary-${i}`;
+                    summaryDiv.innerHTML = `
+                        <div class="rank-badge" id="rank-badge-${i}">${i}</div>
+                        <div class="player-name">Player ${i}</div>
+                        <div class="wins">0 Wins</div>
+                        <div class="points">0 Points</div>
+                        <div class="rank" id="rank-${i}">${i}th Place</div>
+                    `;
+                    summaryGrid.appendChild(summaryDiv);
+                }
+            }
+
+            // Clear all scores
+            function clearScores() {
+                document.querySelectorAll('.score-input').forEach((input) => {
+                    input.value = '';
+                });
+            }
+
+            // Toast notification function
+            function showToast(message, isError = false) {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.className = `toast ${isError ? 'error' : ''}`;
+                toast.classList.add('show');
+
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
+            }
+
+            // Export tournament data
+            function exportData() {
+                if (currentPlayerCount === 0) {
+                    showToast('No tournament initialized', true);
+                    return;
+                }
+
+                const exportData = {
+                    version: '4.0',
+                    timestamp: new Date().toISOString(),
+                    playerCount: currentPlayerCount,
+                    players: {},
+                    tournamentStructure: generatedRounds,
+                    scores: [],
+                };
+
+                // Export player names
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const input = document.getElementById(`player${i}`);
+                    exportData.players[i] = input ? input.value || `Player ${i}` : `Player ${i}`;
+                }
+
+                // Export scores
+                generatedRounds.forEach((round, roundIndex) => {
+                    round.forEach((match, matchIndex) => {
+                        const scoreInputs = document.querySelectorAll(
+                            `.score-input[data-round="${roundIndex}"][data-match="${matchIndex}"]`
+                        );
+                        
+                        const team1Score = scoreInputs[0] ? scoreInputs[0].value || '' : '';
+                        const team2Score = scoreInputs[1] ? scoreInputs[1].value || '' : '';
+                        
+                        exportData.scores.push({
+                            round: roundIndex + 1,
+                            match: matchIndex + 1,
+                            team1: match[0],
+                            team2: match[1],
+                            team1Score: team1Score,
+                            team2Score: team2Score
+                        });
+                    });
+                });
+
+                // Create and download file
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `pickleball-dynamic-tournament-${currentPlayerCount}players-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                showToast('Tournament data exported successfully!');
+            }
+
+            // Import tournament data
+            function importData(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        const tournamentData = JSON.parse(e.target.result);
+
+                        // Validate data structure
+                        if (!tournamentData.players || !tournamentData.tournamentStructure) {
+                            throw new Error('Invalid tournament data format');
+                        }
+
+                        // Initialize tournament
+                        currentPlayerCount = tournamentData.playerCount;
+                        maxRounds = currentPlayerCount - 1;
+                        generatedRounds = tournamentData.tournamentStructure;
+                        
+                        // Rebuild teammate history from imported rounds
+                        teammateHistory = {};
+                        for (let i = 1; i <= currentPlayerCount; i++) {
+                            teammateHistory[i] = new Set();
+                            teammateHistory[i].add(i);
+                        }
+
+                        generatedRounds.forEach(round => {
+                            round.forEach(match => {
+                                const [team1, team2] = match;
+                                teammateHistory[team1[0]].add(team1[1]);
+                                teammateHistory[team1[1]].add(team1[0]);
+                                teammateHistory[team2[0]].add(team2[1]);
+                                teammateHistory[team2[1]].add(team2[0]);
+                            });
+                        });
+
+                        // Update info text
+                        document.getElementById('roundsCount').textContent = generatedRounds.length;
+                        document.getElementById('maxRoundsInfo').textContent = `Maximum rounds: ${maxRounds} (each player plays with each other player once)`;
+                        document.getElementById('roundControls').style.display = 'block';
+                        updateRoundStatus();
+
+                        generatePlayerInputs();
+                        renderAllRounds();
+                        generateSummarySection();
+
+                        // Import player names
+                        for (let i = 1; i <= currentPlayerCount; i++) {
+                            const input = document.getElementById(`player${i}`);
+                            if (input && tournamentData.players[i]) {
+                                input.value = tournamentData.players[i];
+                            }
+                        }
+
+                        // Import scores
+                        if (tournamentData.scores && tournamentData.scores.length > 0) {
+                            tournamentData.scores.forEach((scoreData) => {
+                                const roundIndex = scoreData.round - 1;
+                                const matchIndex = scoreData.match - 1;
+                                const scoreInputs = document.querySelectorAll(
+                                    `.score-input[data-round="${roundIndex}"][data-match="${matchIndex}"]`
+                                );
+                                
+                                if (scoreInputs[0]) scoreInputs[0].value = scoreData.team1Score || '';
+                                if (scoreInputs[1]) scoreInputs[1].value = scoreData.team2Score || '';
+                            });
+                        }
+
+                        // Update displays
+                        updatePlayerDisplays();
+                        updateStats();
+
+                        showToast('Tournament data imported successfully!');
+                    } catch (error) {
+                        console.error('Import error:', error);
+                        showToast('Error importing tournament data. Please check the file format.', true);
+                    }
+                };
+
+                reader.readAsText(file);
+                event.target.value = '';
+            }
+
+            // Clear all data
+            function clearAllData() {
+                if (confirm('Are you sure you want to clear all tournament data? This action cannot be undone.')) {
+                    // Clear player names
+                    for (let i = 1; i <= currentPlayerCount; i++) {
+                        const input = document.getElementById(`player${i}`);
+                        if (input) input.value = '';
+                    }
+
+                    // Clear scores
+                    clearScores();
+
+                    // Update displays
+                    updatePlayerDisplays();
+                    updateStats();
+
+                    showToast('All tournament data cleared!');
+                }
+            }
+
+            // Update player display when names are entered
+            function updatePlayerDisplays() {
+                const players = {};
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const input = document.getElementById(`player${i}`);
+                    players[i] = input ? input.value || `Player ${i}` : `Player ${i}`;
+                }
+
+                // Update all player displays in matches
+                document.querySelectorAll('.player-display').forEach((display) => {
+                    const playerNumbers = display.getAttribute('data-players').split(',');
+                    const playerNames = playerNumbers.map((num) => players[parseInt(num)]);
+                    display.textContent = playerNames.join(' & ');
+                });
+
+                // Update summary section player names
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const summaryElement = document.getElementById(`summary-${i}`);
+                    if (summaryElement) {
+                        const playerNameElement = summaryElement.querySelector('.player-name');
+                        if (playerNameElement) {
+                            playerNameElement.textContent = players[i];
+                        }
+                    }
+                }
+
+                // Update stats
+                updateStats();
+            }
+
+            // Update previous rounds' points displays
+            function updatePreviousPointsDisplays() {
+                generatedRounds.forEach((round, roundIndex) => {
+                    if (roundIndex === 0) return; // Skip round 1, no previous rounds
+                    
+                    round.forEach((match, matchIndex) => {
+                        const team0PreviousPoints = getTeamPreviousRoundsPoints(match[0], roundIndex);
+                        const team1PreviousPoints = getTeamPreviousRoundsPoints(match[1], roundIndex);
+                        
+                        // Find the score inputs for this match
+                        const team0Input = document.querySelector(
+                            `.score-input[data-round="${roundIndex}"][data-match="${matchIndex}"][data-team="0"]`
+                        );
+                        const team1Input = document.querySelector(
+                            `.score-input[data-round="${roundIndex}"][data-match="${matchIndex}"][data-team="1"]`
+                        );
+                        
+                        if (team0Input) {
+                            const team0Names = team0Input.closest('.team')?.querySelector('.team-names');
+                            if (team0Names) {
+                                let previousPointsSpan = team0Names.querySelector('.previous-points');
+                                if (!previousPointsSpan) {
+                                    previousPointsSpan = document.createElement('span');
+                                    previousPointsSpan.className = 'previous-points';
+                                    team0Names.appendChild(previousPointsSpan);
+                                }
+                                previousPointsSpan.textContent = `(${team0PreviousPoints} from previous rounds)`;
+                            }
+                        }
+                        
+                        if (team1Input) {
+                            const team1Names = team1Input.closest('.team')?.querySelector('.team-names');
+                            if (team1Names) {
+                                let previousPointsSpan = team1Names.querySelector('.previous-points');
+                                if (!previousPointsSpan) {
+                                    previousPointsSpan = document.createElement('span');
+                                    previousPointsSpan.className = 'previous-points';
+                                    team1Names.appendChild(previousPointsSpan);
+                                }
+                                previousPointsSpan.textContent = `(${team1PreviousPoints} from previous rounds)`;
+                            }
+                        }
+                    });
+                });
+            }
+
+            function updateStats() {
+                playerStats = {};
+
+                // Initialize stats for all players
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    playerStats[i] = { wins: 0, points: 0, playerId: i };
+                }
+
+                // Process each match
+                generatedRounds.forEach((round, roundIndex) => {
+                    round.forEach((match, matchIndex) => {
+                        const scoreInputs = document.querySelectorAll(
+                            `.score-input[data-round="${roundIndex}"][data-match="${matchIndex}"]`
+                        );
+
+                        if (scoreInputs.length < 2) return;
+
+                        const team1Score = parseInt(scoreInputs[0].value) || 0;
+                        const team2Score = parseInt(scoreInputs[1].value) || 0;
+
+                        // Add points to each player on both teams
+                        match[0].forEach((player) => {
+                            playerStats[player].points += team1Score;
+                        });
+                        match[1].forEach((player) => {
+                            playerStats[player].points += team2Score;
+                        });
+
+                        // Determine winner and add wins to all players on winning team
+                        if (team1Score > team2Score) {
+                            match[0].forEach((player) => {
+                                playerStats[player].wins += 1;
+                            });
+                        } else if (team2Score > team1Score) {
+                            match[1].forEach((player) => {
+                                playerStats[player].wins += 1;
+                            });
+                        }
+                    });
+                });
+
+                // Sort players by wins (descending), then by points (descending) as tie-breaker
+                const sortedPlayers = Object.values(playerStats).sort((a, b) => {
+                    if (b.wins !== a.wins) {
+                        return b.wins - a.wins;
+                    }
+                    return b.points - a.points;
+                });
+
+                // Update the display with rankings
+                for (let i = 0; i < sortedPlayers.length; i++) {
+                    const player = sortedPlayers[i];
+                    const summaryElement = document.getElementById(`summary-${player.playerId}`);
+                    const rankBadge = document.getElementById(`rank-badge-${player.playerId}`);
+                    const rankText = document.getElementById(`rank-${player.playerId}`);
+
+                    if (summaryElement) {
+                        const winsElement = summaryElement.querySelector('.wins');
+                        const pointsElement = summaryElement.querySelector('.points');
+
+                        if (winsElement) {
+                            winsElement.textContent = `${player.wins} Wins`;
+                        }
+                        if (pointsElement) {
+                            pointsElement.textContent = `${player.points} Points`;
+                        }
+
+                        // Update rank badge
+                        if (rankBadge) {
+                            rankBadge.textContent = i + 1;
+
+                            // Style rank badges
+                            rankBadge.className = 'rank-badge';
+                            if (i === 0) {
+                                rankBadge.classList.add('first');
+                                summaryElement.classList.add('winner');
+                                summaryElement.classList.remove('second', 'third');
+                            } else if (i === 1) {
+                                rankBadge.classList.add('second');
+                                summaryElement.classList.add('second');
+                                summaryElement.classList.remove('winner', 'third');
+                            } else if (i === 2) {
+                                rankBadge.classList.add('third');
+                                summaryElement.classList.add('third');
+                                summaryElement.classList.remove('winner', 'second');
+                            } else {
+                                summaryElement.classList.remove('winner', 'second', 'third');
+                            }
+                        }
+
+                        // Update rank text
+                        if (rankText) {
+                            const place = i + 1;
+                            let placeText;
+                            if (place === 1) placeText = '1st Place';
+                            else if (place === 2) placeText = '2nd Place';
+                            else if (place === 3) placeText = '3rd Place';
+                            else placeText = `${place}th Place`;
+
+                            rankText.textContent = placeText;
+                        }
+                    }
+                }
+                
+                // Update previous rounds' points displays
+                updatePreviousPointsDisplays();
+            }
+        </script>
+    </body>
+</html>
+
