@@ -7,6 +7,7 @@
         <link rel="stylesheet" href="styles.css">
         <script src="fixed_dynamic_tournaments/tournament-structure-8.js"></script>
         <script src="fixed_dynamic_tournaments/tournament-structure-12.js"></script>
+        <script src="fixed_dynamic_tournaments/tournament-structure-16.js"></script>
     </head>
     <body>
         <div class="container">
@@ -28,6 +29,7 @@
                     <div class="tournament-options">
                         <button class="btn btn-tournament" onclick="initializeTournament(8)">8 Players Tournament</button>
                         <button class="btn btn-tournament" onclick="initializeTournament(12)">12 Players Tournament</button>
+                        <button class="btn btn-tournament" onclick="initializeTournament(16)">16 Players Tournament</button>
                     </div>
                 </div>
                 <div class="info-text">
@@ -77,7 +79,7 @@
 
             // Initialize tournament
             function initializeTournament(playerCount) {
-                if (playerCount !== 8 && playerCount !== 12) {
+                if (playerCount !== 8 && playerCount !== 12 && playerCount !== 16) {
                     showToast('Only 8 and 12 player tournaments are supported', true);
                     return;
                 }
@@ -93,6 +95,8 @@
                     fixedTournamentStructure = window.fixedTournamentStructure8;
                 } else if (playerCount === 12) {
                     fixedTournamentStructure = window.fixedTournamentStructure12;
+                } else if (playerCount === 16) {
+                    fixedTournamentStructure = window.fixedTournamentStructure16;
                 }
 
                 if (!fixedTournamentStructure) {
