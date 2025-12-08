@@ -895,59 +895,55 @@
                     return b.points - a.points;
                 });
 
-                // Update the display with rankings
+                // Get player names for display
+                const players = {};
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const input = document.getElementById(`player${i}`);
+                    players[i] = input ? input.value || `Player ${i}` : `Player ${i}`;
+                }
+
+                // Get the summary grid container
+                const summaryGrid = document.getElementById('summaryGrid');
+                
+                // Clear the grid
+                summaryGrid.innerHTML = '';
+
+                // Re-create summary items in ranked order
                 for (let i = 0; i < sortedPlayers.length; i++) {
                     const player = sortedPlayers[i];
-                    const summaryElement = document.getElementById(`summary-${player.playerId}`);
-                    const rankBadge = document.getElementById(`rank-badge-${player.playerId}`);
-                    const rankText = document.getElementById(`rank-${player.playerId}`);
+                    const place = i + 1;
+                    let placeText;
+                    if (place === 1) placeText = '1st Place';
+                    else if (place === 2) placeText = '2nd Place';
+                    else if (place === 3) placeText = '3rd Place';
+                    else placeText = `${place}th Place`;
 
-                    if (summaryElement) {
-                        const winsElement = summaryElement.querySelector('.wins');
-                        const pointsElement = summaryElement.querySelector('.points');
-
-                        if (winsElement) {
-                            winsElement.textContent = `${player.wins} Wins`;
-                        }
-                        if (pointsElement) {
-                            pointsElement.textContent = `${player.points} Points`;
-                        }
-
-                        // Update rank badge
-                        if (rankBadge) {
-                            rankBadge.textContent = i + 1;
-
-                            // Style rank badges
-                            rankBadge.className = 'rank-badge';
-                            if (i === 0) {
-                                rankBadge.classList.add('first');
-                                summaryElement.classList.add('winner');
-                                summaryElement.classList.remove('second', 'third');
-                            } else if (i === 1) {
-                                rankBadge.classList.add('second');
-                                summaryElement.classList.add('second');
-                                summaryElement.classList.remove('winner', 'third');
-                            } else if (i === 2) {
-                                rankBadge.classList.add('third');
-                                summaryElement.classList.add('third');
-                                summaryElement.classList.remove('winner', 'second');
-                            } else {
-                                summaryElement.classList.remove('winner', 'second', 'third');
-                            }
-                        }
-
-                        // Update rank text
-                        if (rankText) {
-                            const place = i + 1;
-                            let placeText;
-                            if (place === 1) placeText = '1st Place';
-                            else if (place === 2) placeText = '2nd Place';
-                            else if (place === 3) placeText = '3rd Place';
-                            else placeText = `${place}th Place`;
-
-                            rankText.textContent = placeText;
-                        }
+                    // Determine rank badge class
+                    let rankBadgeClass = 'rank-badge';
+                    let summaryItemClass = 'summary-item';
+                    if (i === 0) {
+                        rankBadgeClass += ' first';
+                        summaryItemClass += ' winner';
+                    } else if (i === 1) {
+                        rankBadgeClass += ' second';
+                        summaryItemClass += ' second';
+                    } else if (i === 2) {
+                        rankBadgeClass += ' third';
+                        summaryItemClass += ' third';
                     }
+
+                    // Create new summary item
+                    const summaryDiv = document.createElement('div');
+                    summaryDiv.className = summaryItemClass;
+                    summaryDiv.id = `summary-${player.playerId}`;
+                    summaryDiv.innerHTML = `
+                        <div class="${rankBadgeClass}" id="rank-badge-${player.playerId}">${place}</div>
+                        <div class="player-name">${players[player.playerId]}</div>
+                        <div class="wins">${player.wins} Wins</div>
+                        <div class="points">${player.points} Points</div>
+                        <div class="rank" id="rank-${player.playerId}">${placeText}</div>
+                    `;
+                    summaryGrid.appendChild(summaryDiv);
                 }
                 
                 // Update previous rounds' points displays
