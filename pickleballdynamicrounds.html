@@ -17,6 +17,7 @@
             <div class="controls">
                 <button class="btn btn-export" onclick="exportData()">📤 Export Tournament Data</button>
                 <button class="btn btn-import" onclick="document.getElementById('fileInput').click()">📥 Import Tournament Data</button>
+                <button class="btn btn-print" onclick="printTournamentSummary()">🖨️ Print Tournament Summary</button>
                 <button class="btn btn-clear" onclick="clearAllData()">🗑️ Clear All Data</button>
                 <input type="file" id="fileInput" class="file-input" accept=".json" onchange="importData(event)" />
             </div>
@@ -514,7 +515,7 @@
                         const team1PreviousDisplay = roundIndex > 0 ? `<span class="previous-points">(${team1PreviousPoints} from previous rounds)</span>` : '';
                         
                         matchDiv.innerHTML = `
-                            <h4>Court ${String.fromCharCode(65 + matchIndex)}</h4>
+                            <h4>Court ${matchIndex + 1}</h4>
                             <div class="team">
                                 <span class="team-names">
                                     <span class="player-display" data-players="${match[0][0]},${match[0][1]}"></span>
@@ -948,6 +949,342 @@
                 
                 // Update previous rounds' points displays
                 updatePreviousPointsDisplays();
+            }
+
+            // Print tournament summary
+            function printTournamentSummary() {
+                if (currentPlayerCount === 0 || generatedRounds.length === 0) {
+                    showToast('No tournament data to print', true);
+                    return;
+                }
+
+                // Get player names
+                const players = {};
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    const input = document.getElementById(`player${i}`);
+                    players[i] = input ? input.value || `Player ${i}` : `Player ${i}`;
+                }
+
+                // Build the summary HTML
+                let summaryHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Tournament Summary</title>
+    <style>
+        @media print {
+            body { margin: 0; padding: 20px; }
+            .no-print { display: none; }
+            .page-break { page-break-after: always; }
+            .match-result {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                orphans: 3;
+                widows: 3;
+            }
+            .round-section {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+            .standings-table {
+                page-break-inside: auto;
+            }
+            .standings-table tr {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 20px;
+        }
+        .match-result {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .team {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 8px;
+            background-color: white;
+            border-radius: 3px;
+        }
+        .team.winner {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            font-weight: bold;
+        }
+        .team.loser {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        .team.tie {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        .score {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .vs {
+            text-align: center;
+            margin: 5px 0;
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+        .standings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .standings-table th,
+        .standings-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .standings-table th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        .standings-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .standings-table tr:first-child {
+            background-color: #d4edda;
+        }
+        .standings-table tr:nth-child(2) {
+            background-color: #e7f3e9;
+        }
+        .standings-table tr:nth-child(3) {
+            background-color: #f0f8f1;
+        }
+        .rank {
+            font-weight: bold;
+            width: 50px;
+        }
+        .print-button {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .print-button button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .print-button button:hover {
+            background-color: #2980b9;
+        }
+        .round-section {
+            margin-bottom: 30px;
+        }
+        .court-label {
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏓 Pickleball Tournament Summary</h1>
+    <p style="text-align: center; color: #7f8c8d;">
+        Generated on ${new Date().toLocaleString()}
+    </p>
+`;
+
+                // Add all rounds and matches
+                summaryHTML += '<h2>Match Results</h2>\n';
+                
+                generatedRounds.forEach((round, roundIndex) => {
+                    summaryHTML += `<div class="round-section">\n`;
+                    summaryHTML += `<h3>Round ${roundIndex + 1}</h3>\n`;
+                    
+                    round.forEach((match, matchIndex) => {
+                        const courtLabel = matchIndex + 1; // 1, 2, 3, etc.
+                        const team1 = match[0];
+                        const team2 = match[1];
+                        const team1Names = `${players[team1[0]]} & ${players[team1[1]]}`;
+                        const team2Names = `${players[team2[0]]} & ${players[team2[1]]}`;
+                        
+                        // Get scores
+                        const scoreInputs = document.querySelectorAll(
+                            `.score-input[data-round="${roundIndex}"][data-match="${matchIndex}"]`
+                        );
+                        const team1Score = scoreInputs[0] ? (parseInt(scoreInputs[0].value) || 0) : 0;
+                        const team2Score = scoreInputs[1] ? (parseInt(scoreInputs[1].value) || 0) : 0;
+                        
+                        // Determine winner
+                        let team1Class = '';
+                        let team2Class = '';
+                        let winnerText = '';
+                        
+                        if (team1Score > team2Score) {
+                            team1Class = 'winner';
+                            team2Class = 'loser';
+                            winnerText = `🏆 Winner: ${team1Names}`;
+                        } else if (team2Score > team1Score) {
+                            team1Class = 'loser';
+                            team2Class = 'winner';
+                            winnerText = `🏆 Winner: ${team2Names}`;
+                        } else if (team1Score === team2Score && team1Score > 0) {
+                            team1Class = 'tie';
+                            team2Class = 'tie';
+                            winnerText = '🤝 Tie';
+                        } else {
+                            team1Class = '';
+                            team2Class = '';
+                            winnerText = '⏳ Not played yet';
+                        }
+                        
+                        summaryHTML += `
+    <div class="match-result">
+        <div class="court-label">Court ${courtLabel}</div>
+        <div class="team ${team1Class}">
+            <span>${team1Names}</span>
+            <span class="score">${team1Score}</span>
+        </div>
+        <div class="vs">VS</div>
+        <div class="team ${team2Class}">
+            <span>${team2Names}</span>
+            <span class="score">${team2Score}</span>
+        </div>
+        <div style="text-align: center; margin-top: 10px; font-weight: bold; color: #2c3e50;">
+            ${winnerText}
+        </div>
+    </div>
+`;
+                    });
+                    
+                    summaryHTML += '</div>\n';
+                });
+
+                // Add final standings
+                summaryHTML += '<h2>Final Standings</h2>\n';
+                
+                // Calculate stats for standings
+                const standingsStats = {};
+                for (let i = 1; i <= currentPlayerCount; i++) {
+                    standingsStats[i] = { wins: 0, points: 0, playerId: i };
+                }
+
+                generatedRounds.forEach((round, roundIndex) => {
+                    round.forEach((match, matchIndex) => {
+                        const scoreInputs = document.querySelectorAll(
+                            `.score-input[data-round="${roundIndex}"][data-match="${matchIndex}"]`
+                        );
+                        if (scoreInputs.length < 2) return;
+
+                        const team1Score = parseInt(scoreInputs[0].value) || 0;
+                        const team2Score = parseInt(scoreInputs[1].value) || 0;
+
+                        match[0].forEach((player) => {
+                            standingsStats[player].points += team1Score;
+                        });
+                        match[1].forEach((player) => {
+                            standingsStats[player].points += team2Score;
+                        });
+
+                        if (team1Score > team2Score) {
+                            match[0].forEach((player) => {
+                                standingsStats[player].wins += 1;
+                            });
+                        } else if (team2Score > team1Score) {
+                            match[1].forEach((player) => {
+                                standingsStats[player].wins += 1;
+                            });
+                        }
+                    });
+                });
+
+                const sortedStandings = Object.values(standingsStats).sort((a, b) => {
+                    if (b.wins !== a.wins) {
+                        return b.wins - a.wins;
+                    }
+                    return b.points - a.points;
+                });
+
+                summaryHTML += `
+    <table class="standings-table">
+        <thead>
+            <tr>
+                <th class="rank">Rank</th>
+                <th>Player</th>
+                <th>Wins</th>
+                <th>Points</th>
+            </tr>
+        </thead>
+        <tbody>
+`;
+
+                sortedStandings.forEach((player, index) => {
+                    const place = index + 1;
+                    summaryHTML += `
+            <tr>
+                <td class="rank">${place}</td>
+                <td>${players[player.playerId]}</td>
+                <td>${player.wins}</td>
+                <td>${player.points}</td>
+            </tr>
+`;
+                });
+
+                summaryHTML += `
+        </tbody>
+    </table>
+`;
+
+                summaryHTML += `
+    <div class="print-button no-print">
+        <button onclick="window.print()">🖨️ Print Summary</button>
+    </div>
+</body>
+</html>
+`;
+
+                // Open in new window and print
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(summaryHTML);
+                printWindow.document.close();
+                
+                // Wait for content to load, then trigger print dialog
+                printWindow.onload = function() {
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 250);
+                };
+
+                showToast('Tournament summary opened in new window');
             }
         </script>
     </body>

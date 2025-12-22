@@ -55,6 +55,15 @@ h1 {
     background-color: #0056b3;
 }
 
+.btn-print {
+    background-color: #ff9800;
+    color: white;
+}
+
+.btn-print:hover {
+    background-color: #e68900;
+}
+
 .btn-clear {
     background-color: #dc3545;
     color: white;
