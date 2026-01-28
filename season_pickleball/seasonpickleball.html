@@ -1,0 +1,1308 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Pickleball Season - Court Management</title>
+        <link rel="stylesheet" href="../styles.css">
+        <style>
+            .round-controls {
+                text-align: center;
+                margin: 20px 0;
+                padding: 15px;
+                background-color: #e9ecef;
+                border-radius: 8px;
+            }
+            .round-controls button {
+                margin: 5px;
+            }
+            .session-header {
+                background-color: #2c5aa0;
+                color: white;
+                padding: 10px;
+                border-radius: 5px;
+                margin-bottom: 15px;
+                font-weight: bold;
+            }
+            .previous-points {
+                font-size: 0.85em;
+                color: #666;
+                font-style: italic;
+                margin-left: 5px;
+            }
+            .btn-save:hover {
+                background-color: #5a32a3 !important;
+            }
+            .btn-load:hover {
+                background-color: #1aa179 !important;
+            }
+            #loadSeasonDialog {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0,0,0,0.5);
+                z-index: 2000;
+                justify-content: center;
+                align-items: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🏓 Pickleball Season - Court Management</h1>
+
+            <!-- Control Buttons -->
+            <div class="controls">
+                <button class="btn btn-export" onclick="exportData()">📤 Export Season Data</button>
+                <button class="btn btn-import" onclick="document.getElementById('fileInput').click()">📥 Import Season Data</button>
+                <button class="btn btn-save" onclick="saveToLocalStorage()" style="background-color: #6f42c1; color: white;">💾 Save Season Data</button>
+                <button class="btn btn-load" onclick="showLoadSeasonDialog()" style="background-color: #20c997; color: white;">📂 Load Saved Season</button>
+                <button class="btn btn-print" onclick="printSeasonSummary()">🖨️ Print Season Summary</button>
+                <button class="btn btn-clear" onclick="clearAllData()">🗑️ Clear All Data</button>
+                <input type="file" id="fileInput" class="file-input" accept=".json" onchange="importData(event)" />
+            </div>
+
+            <!-- Load Season Dialog -->
+            <div id="loadSeasonDialog">
+                <div style="background-color: white; padding: 30px; border-radius: 10px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                    <h3 style="margin-top: 0; color: #2c5aa0;">Load Saved Season</h3>
+                    <div id="savedSeasonsList" style="margin: 20px 0;">
+                        <!-- Saved seasons will be listed here -->
+                    </div>
+                    <div style="text-align: right;">
+                        <button class="btn" onclick="hideLoadSeasonDialog()" style="background-color: #6c757d; color: white;">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Court Selection Section -->
+            <div class="player-count-section">
+                <h3>Season Setup</h3>
+                <div class="player-count-input">
+                    <label>Number of Courts:</label>
+                    <input type="number" id="numCourts" min="1" max="10" value="2" onchange="updatePlayerCount()" />
+                    <span id="playerCountDisplay">8 players</span>
+                </div>
+                <div class="info-text">
+                    <button class="btn btn-tournament" onclick="initializeSeason()" style="margin-top: 10px;">Initialize Season</button>
+                </div>
+            </div>
+
+            <!-- Player Names Section -->
+            <div class="player-section" id="playerSection" style="display: none;">
+                <h3>Player Names</h3>
+                <div class="player-grid" id="playerGrid">
+                    <!-- Player inputs will be generated dynamically -->
+                </div>
+            </div>
+
+            <!-- Match Controls -->
+            <div class="round-controls" id="matchControls" style="display: none;">
+                <button class="btn btn-generate" onclick="generateNextMatch()">🎲 Generate Next Match</button>
+                <button class="btn btn-generate" onclick="generateNewCourts()" style="background-color: #17a2b8;">🔄 End Session and Generate New Courts</button>
+                <span id="matchStatus"></span>
+            </div>
+
+            <!-- Tournament Sessions -->
+            <div id="tournamentSessions">
+                <!-- Sessions will be generated dynamically -->
+            </div>
+
+            <!-- Summary Section -->
+            <div class="summary-section">
+                <h3>🏆 Season Standings</h3>
+                <div class="summary-grid" id="summaryGrid">
+                    <!-- Summary items will be generated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast notification -->
+        <div id="toast" class="toast"></div>
+
+        <script>
+            let numCourts = 0;
+            let currentPlayerCount = 0;
+            let players = []; // Array of player objects: {id, name}
+            let sessions = []; // Array of sessions: [{sessionId, courtAssignments: [[players]], matches: [{court, team1, team2, team1Score, team2Score}]}]
+            let currentSessionId = 0;
+            let currentSessionTeammateCounts = {}; // Track teammate pairings per session: {sessionId: {court: {playerId: {teammateId: count}}}}
+
+            // Update player count display
+            function updatePlayerCount() {
+                const courts = parseInt(document.getElementById('numCourts').value) || 1;
+                const totalPlayers = courts * 4;
+                document.getElementById('playerCountDisplay').textContent = `${totalPlayers} players`;
+            }
+
+            // Initialize season
+            function initializeSeason() {
+                numCourts = parseInt(document.getElementById('numCourts').value) || 1;
+                currentPlayerCount = numCourts * 4;
+                
+                if (numCourts < 1) {
+                    showToast('Please select at least 1 court', true);
+                    return;
+                }
+
+                // Reset data
+                players = [];
+                sessions = [];
+                currentSessionId = 0;
+                currentSessionTeammateCounts = {};
+
+                // Initialize players
+                for (let i = 0; i < currentPlayerCount; i++) {
+                    players.push({
+                        id: i,
+                        name: `Player ${i + 1}`
+                    });
+                }
+
+                // Show player section
+                document.getElementById('playerSection').style.display = 'block';
+                document.getElementById('matchControls').style.display = 'block';
+
+                generatePlayerInputs();
+                generateSummarySection();
+                
+                // Generate first match
+                generateFirstMatch();
+
+                showToast(`Season initialized with ${numCourts} court(s) and ${currentPlayerCount} players!`);
+            }
+
+            // Generate player input fields
+            function generatePlayerInputs() {
+                const playerGrid = document.getElementById('playerGrid');
+                playerGrid.innerHTML = '';
+
+                players.forEach((player, index) => {
+                    const playerDiv = document.createElement('div');
+                    playerDiv.className = 'player-input';
+                    playerDiv.innerHTML = `
+                        <label>Player ${index + 1}</label>
+                        <input type="text" id="player${index}" placeholder="Enter name" value="${player.name}" />
+                    `;
+                    playerGrid.appendChild(playerDiv);
+                });
+
+                // Add event listeners
+                players.forEach((player, index) => {
+                    const input = document.getElementById(`player${index}`);
+                    if (input) {
+                        input.addEventListener('input', (e) => {
+                            players[index].name = e.target.value || `Player ${index + 1}`;
+                            updatePlayerDisplays();
+                            updateStats();
+                        });
+                    }
+                });
+            }
+
+            // Helper function to get current date in readable format
+            function getCurrentDate() {
+                const now = new Date();
+                return now.toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+            }
+
+            // Generate first match - ordered by player array, pairing (0&3) vs (1&2)
+            function generateFirstMatch() {
+                // Create first session
+                const sessionId = currentSessionId++;
+                const courtAssignments = [];
+                const matches = [];
+
+                // Assign players to courts (0-3 on court 1, 4-7 on court 2, etc.)
+                for (let court = 0; court < numCourts; court++) {
+                    const courtPlayers = [];
+                    for (let i = 0; i < 4; i++) {
+                        const playerIndex = court * 4 + i;
+                        courtPlayers.push(playerIndex);
+                    }
+                    courtAssignments.push(courtPlayers);
+
+                    // Create match: (0&3) vs (1&2) pattern
+                    const team1 = [courtPlayers[0], courtPlayers[3]];
+                    const team2 = [courtPlayers[1], courtPlayers[2]];
+                    matches.push({
+                        court: court,
+                        team1: team1,
+                        team2: team2,
+                        team1Score: '',
+                        team2Score: ''
+                    });
+                }
+
+                sessions.push({
+                    sessionId: sessionId,
+                    date: getCurrentDate(),
+                    courtAssignments: courtAssignments,
+                    matches: matches
+                });
+
+                // Initialize teammate tracking for this session
+                initializeSessionTeammateTracking(sessionId, courtAssignments);
+
+                renderAllSessions();
+                updateMatchStatus();
+                updateStats();
+            }
+
+            // Initialize teammate tracking for a session
+            function initializeSessionTeammateTracking(sessionId, courtAssignments) {
+                if (!currentSessionTeammateCounts[sessionId]) {
+                    currentSessionTeammateCounts[sessionId] = {};
+                }
+
+                courtAssignments.forEach((courtPlayers, court) => {
+                    if (!currentSessionTeammateCounts[sessionId][court]) {
+                        currentSessionTeammateCounts[sessionId][court] = {};
+                    }
+
+                    courtPlayers.forEach(playerId => {
+                        if (!currentSessionTeammateCounts[sessionId][court][playerId]) {
+                            currentSessionTeammateCounts[sessionId][court][playerId] = {};
+                        }
+                        courtPlayers.forEach(teammateId => {
+                            if (playerId !== teammateId) {
+                                currentSessionTeammateCounts[sessionId][court][playerId][teammateId] = 0;
+                            }
+                        });
+                    });
+                });
+            }
+
+            // Record teammate pairing in current session
+            function recordTeammatePairing(sessionId, court, team) {
+                const [p1, p2] = team;
+                if (currentSessionTeammateCounts[sessionId] && 
+                    currentSessionTeammateCounts[sessionId][court] &&
+                    currentSessionTeammateCounts[sessionId][court][p1]) {
+                    currentSessionTeammateCounts[sessionId][court][p1][p2] = 
+                        (currentSessionTeammateCounts[sessionId][court][p1][p2] || 0) + 1;
+                }
+                if (currentSessionTeammateCounts[sessionId] && 
+                    currentSessionTeammateCounts[sessionId][court] &&
+                    currentSessionTeammateCounts[sessionId][court][p2]) {
+                    currentSessionTeammateCounts[sessionId][court][p2][p1] = 
+                        (currentSessionTeammateCounts[sessionId][court][p2][p1] || 0) + 1;
+                }
+            }
+
+            // Generate next match - keep same courts, switch teammates
+            function generateNextMatch() {
+                if (sessions.length === 0) {
+                    showToast('Please initialize season first', true);
+                    return;
+                }
+
+                const currentSession = sessions[sessions.length - 1];
+                const sessionId = currentSession.sessionId;
+                const courtAssignments = currentSession.courtAssignments;
+                const existingMatches = currentSession.matches;
+
+                // Generate next valid matchups for each court
+                const newMatches = [];
+
+                for (let court = 0; court < numCourts; court++) {
+                    const courtPlayers = courtAssignments[court];
+                    const nextMatchup = findNextValidMatchup(courtPlayers, sessionId, court, existingMatches);
+
+                    if (!nextMatchup) {
+                        showToast(`Court ${court + 1}: All possible matchups have been played twice. Consider generating new courts.`, true);
+                        // Use fallback pairing
+                        const fallback = generateFallbackMatchup(courtPlayers);
+                        newMatches.push({
+                            court: court,
+                            team1: fallback.team1,
+                            team2: fallback.team2,
+                            team1Score: '',
+                            team2Score: ''
+                        });
+                    } else {
+                        newMatches.push({
+                            court: court,
+                            team1: nextMatchup.team1,
+                            team2: nextMatchup.team2,
+                            team1Score: '',
+                            team2Score: ''
+                        });
+                    }
+                }
+
+                // Add matches to current session
+                currentSession.matches.push(...newMatches);
+
+                // Record teammate pairings
+                newMatches.forEach(match => {
+                    recordTeammatePairing(sessionId, match.court, match.team1);
+                    recordTeammatePairing(sessionId, match.court, match.team2);
+                });
+
+                renderAllSessions();
+                updateMatchStatus();
+                updateStats();
+
+                showToast('Next match generated!');
+            }
+
+            // Find next valid matchup for a court
+            function findNextValidMatchup(courtPlayers, sessionId, court, existingMatches) {
+                // Get all possible team combinations
+                const possibleTeams = [];
+                for (let i = 0; i < courtPlayers.length; i++) {
+                    for (let j = i + 1; j < courtPlayers.length; j++) {
+                        possibleTeams.push([courtPlayers[i], courtPlayers[j]]);
+                    }
+                }
+
+                // Get all possible matchups (pairings of teams)
+                const possibleMatchups = [];
+                for (let i = 0; i < possibleTeams.length; i++) {
+                    for (let j = i + 1; j < possibleTeams.length; j++) {
+                        const team1 = possibleTeams[i];
+                        const team2 = possibleTeams[j];
+                        // Ensure teams don't share players
+                        if (!team1.some(p => team2.includes(p))) {
+                            possibleMatchups.push({ team1, team2 });
+                        }
+                    }
+                }
+
+                // Helper function to normalize matchup key (always put smaller team first)
+                function normalizeMatchupKey(team1, team2) {
+                    const t1 = [Math.min(team1[0], team1[1]), Math.max(team1[0], team1[1])];
+                    const t2 = [Math.min(team2[0], team2[1]), Math.max(team2[0], team2[1])];
+                    // Put smaller team first
+                    if (t1[0] < t2[0] || (t1[0] === t2[0] && t1[1] < t2[1])) {
+                        return `${t1[0]}-${t1[1]}-${t2[0]}-${t2[1]}`;
+                    } else {
+                        return `${t2[0]}-${t2[1]}-${t1[0]}-${t1[1]}`;
+                    }
+                }
+
+                // Count how many times each matchup has been played in this session
+                const matchupCounts = {};
+                existingMatches.forEach(match => {
+                    if (match.court === court) {
+                        const key = normalizeMatchupKey(match.team1, match.team2);
+                        matchupCounts[key] = (matchupCounts[key] || 0) + 1;
+                    }
+                });
+
+                // Find a matchup that hasn't been played twice yet
+                for (const matchup of possibleMatchups) {
+                    const key = normalizeMatchupKey(matchup.team1, matchup.team2);
+                    const count = matchupCounts[key] || 0;
+                    if (count < 2) {
+                        return matchup;
+                    }
+                }
+
+                return null; // All matchups have been played twice
+            }
+
+            // Fallback matchup generator
+            function generateFallbackMatchup(courtPlayers) {
+                // Simple pairing: first two vs last two
+                return {
+                    team1: [courtPlayers[0], courtPlayers[1]],
+                    team2: [courtPlayers[2], courtPlayers[3]]
+                };
+            }
+
+            // Generate new courts - sort by points and reassign
+            function generateNewCourts() {
+                if (sessions.length === 0) {
+                    showToast('Please initialize season first', true);
+                    return;
+                }
+
+                // Calculate current points for all players
+                const playerPoints = {};
+                players.forEach(player => {
+                    playerPoints[player.id] = 0;
+                });
+
+                sessions.forEach(session => {
+                    session.matches.forEach(match => {
+                        const team1Score = parseInt(match.team1Score) || 0;
+                        const team2Score = parseInt(match.team2Score) || 0;
+                        
+                        match.team1.forEach(playerId => {
+                            playerPoints[playerId] += team1Score;
+                        });
+                        match.team2.forEach(playerId => {
+                            playerPoints[playerId] += team2Score;
+                        });
+                    });
+                });
+
+                // Sort players by points (descending)
+                const sortedPlayers = [...players].sort((a, b) => {
+                    return playerPoints[b.id] - playerPoints[a.id];
+                });
+
+                // Create new session with court assignments based on points
+                const sessionId = currentSessionId++;
+                const courtAssignments = [];
+                const matches = [];
+
+                // Assign top 4 to court 1, next 4 to court 2, etc.
+                for (let court = 0; court < numCourts; court++) {
+                    const courtPlayers = [];
+                    for (let i = 0; i < 4; i++) {
+                        const playerIndex = sortedPlayers[court * 4 + i].id;
+                        courtPlayers.push(playerIndex);
+                    }
+                    courtAssignments.push(courtPlayers);
+
+                    // Create first match: (0&3) vs (1&2) pattern
+                    const team1 = [courtPlayers[0], courtPlayers[3]];
+                    const team2 = [courtPlayers[1], courtPlayers[2]];
+                    matches.push({
+                        court: court,
+                        team1: team1,
+                        team2: team2,
+                        team1Score: '',
+                        team2Score: ''
+                    });
+                }
+
+                sessions.push({
+                    sessionId: sessionId,
+                    date: getCurrentDate(),
+                    courtAssignments: courtAssignments,
+                    matches: matches
+                });
+
+                // Initialize teammate tracking for new session
+                initializeSessionTeammateTracking(sessionId, courtAssignments);
+
+                // Record initial teammate pairings
+                matches.forEach(match => {
+                    recordTeammatePairing(sessionId, match.court, match.team1);
+                    recordTeammatePairing(sessionId, match.court, match.team2);
+                });
+
+                renderAllSessions();
+                updateMatchStatus();
+                updateStats();
+
+                showToast('New courts generated based on current standings!');
+            }
+
+            // Render all sessions
+            function renderAllSessions() {
+                // Save existing scores before clearing
+                const savedScores = saveScores();
+
+                const tournamentSessions = document.getElementById('tournamentSessions');
+                tournamentSessions.innerHTML = '';
+
+                sessions.forEach((session, sessionIndex) => {
+                    const sessionDiv = document.createElement('div');
+                    sessionDiv.className = 'round';
+                    const sessionDate = session.date || 'Date not set';
+                    sessionDiv.innerHTML = `<div class="session-header">Session ${sessionIndex + 1} - ${sessionDate}</div>`;
+
+                    const matchesDiv = document.createElement('div');
+                    matchesDiv.className = 'matches';
+
+                    // Group matches by court for this session
+                    const matchesByCourt = {};
+                    session.matches.forEach(match => {
+                        if (!matchesByCourt[match.court]) {
+                            matchesByCourt[match.court] = [];
+                        }
+                        matchesByCourt[match.court].push(match);
+                    });
+
+                    // Render matches grouped by court
+                    Object.keys(matchesByCourt).sort((a, b) => parseInt(a) - parseInt(b)).forEach(courtNum => {
+                        const courtMatches = matchesByCourt[courtNum];
+                        const courtDiv = document.createElement('div');
+                        courtDiv.className = 'match';
+                        courtDiv.innerHTML = `<h4>Court ${parseInt(courtNum) + 1}</h4>`;
+
+                        courtMatches.forEach((match, matchIndex) => {
+                            const matchKey = `${session.sessionId}-${match.court}-${matchIndex}`;
+                            const team0Key = `${matchKey}-0`;
+                            const team1Key = `${matchKey}-1`;
+                            const team0Score = savedScores[team0Key] || match.team1Score || '';
+                            const team1Score = savedScores[team1Key] || match.team2Score || '';
+
+                            // Alternate background colors for matches
+                            const isEven = matchIndex % 2 === 0;
+                            const backgroundColor = isEven ? '#f8f9fa' : '#e9ecef';
+                            const borderColor = isEven ? '#ddd' : '#bbb';
+
+                            const matchElement = document.createElement('div');
+                            matchElement.className = 'match-game';
+                            matchElement.style.marginBottom = matchIndex < courtMatches.length - 1 ? '20px' : '0';
+                            matchElement.style.padding = '12px';
+                            matchElement.style.border = `2px solid ${borderColor}`;
+                            matchElement.style.borderRadius = '5px';
+                            matchElement.style.backgroundColor = backgroundColor;
+                            matchElement.style.position = 'relative';
+                            
+                            // Build HTML with match label
+                            matchElement.innerHTML = `
+                                <div style="position: absolute; top: -10px; left: 10px; background-color: #2c5aa0; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;">
+                                    Match ${matchIndex + 1}
+                                </div>
+                                <div style="margin-top: 8px;">
+                                    <div class="team">
+                                        <span class="team-names">
+                                            <span class="player-display" data-players="${match.team1[0]},${match.team1[1]}"></span>
+                                        </span>
+                                        <input type="number" class="score-input" data-session="${session.sessionId}" data-court="${match.court}" data-match="${matchIndex}" data-team="0" placeholder="Score" value="${team0Score}" />
+                                    </div>
+                                    <div class="vs">VS</div>
+                                    <div class="team">
+                                        <span class="team-names">
+                                            <span class="player-display" data-players="${match.team2[0]},${match.team2[1]}"></span>
+                                        </span>
+                                        <input type="number" class="score-input" data-session="${session.sessionId}" data-court="${match.court}" data-match="${matchIndex}" data-team="1" placeholder="Score" value="${team1Score}" />
+                                    </div>
+                                </div>
+                            `;
+                            courtDiv.appendChild(matchElement);
+                        });
+
+                        matchesDiv.appendChild(courtDiv);
+                    });
+
+                    sessionDiv.appendChild(matchesDiv);
+                    tournamentSessions.appendChild(sessionDiv);
+                });
+
+                // Add event listeners to score inputs
+                document.querySelectorAll('.score-input').forEach((input) => {
+                    input.addEventListener('input', (e) => {
+                        const sessionId = parseInt(e.target.getAttribute('data-session'));
+                        const court = parseInt(e.target.getAttribute('data-court'));
+                        const matchIndex = parseInt(e.target.getAttribute('data-match'));
+                        const team = parseInt(e.target.getAttribute('data-team'));
+                        const score = e.target.value;
+
+                        const session = sessions.find(s => s.sessionId === sessionId);
+                        if (session) {
+                            // Find matches for this court
+                            const courtMatches = session.matches.filter(m => m.court === court);
+                            const match = courtMatches[matchIndex];
+                            if (match) {
+                                if (team === 0) {
+                                    match.team1Score = score;
+                                } else {
+                                    match.team2Score = score;
+                                }
+                            }
+                        }
+                        updateStats();
+                    });
+                });
+
+                // Update player displays
+                updatePlayerDisplays();
+            }
+
+            // Save current scores before re-rendering
+            function saveScores() {
+                const scores = {};
+                document.querySelectorAll('.score-input').forEach((input) => {
+                    const sessionId = input.getAttribute('data-session');
+                    const court = input.getAttribute('data-court');
+                    const matchIndex = input.getAttribute('data-match');
+                    const teamIndex = input.getAttribute('data-team');
+                    const key = `${sessionId}-${court}-${matchIndex}-${teamIndex}`;
+                    scores[key] = input.value;
+                });
+                return scores;
+            }
+
+            // Update match status
+            function updateMatchStatus() {
+                const statusElement = document.getElementById('matchStatus');
+                const totalMatches = sessions.reduce((sum, session) => sum + session.matches.length, 0);
+                statusElement.textContent = `Total matches: ${totalMatches} | Sessions: ${sessions.length}`;
+            }
+
+            // Generate summary section
+            function generateSummarySection() {
+                const summaryGrid = document.getElementById('summaryGrid');
+                summaryGrid.innerHTML = '';
+
+                players.forEach((player, index) => {
+                    const summaryDiv = document.createElement('div');
+                    summaryDiv.className = 'summary-item';
+                    summaryDiv.id = `summary-${player.id}`;
+                    summaryDiv.innerHTML = `
+                        <div class="rank-badge" id="rank-badge-${player.id}">${index + 1}</div>
+                        <div class="player-name">${player.name}</div>
+                        <div class="points">0 Points</div>
+                        <div class="rank" id="rank-${player.id}">${index + 1}th Place</div>
+                    `;
+                    summaryGrid.appendChild(summaryDiv);
+                });
+            }
+
+            // Update player display when names are entered
+            function updatePlayerDisplays() {
+                // Update all player displays in matches
+                document.querySelectorAll('.player-display').forEach((display) => {
+                    const playerNumbers = display.getAttribute('data-players').split(',');
+                    const playerNames = playerNumbers.map((num) => {
+                        const player = players.find(p => p.id === parseInt(num));
+                        return player ? player.name : `Player ${parseInt(num) + 1}`;
+                    });
+                    display.textContent = playerNames.join(' & ');
+                });
+            }
+
+            // Update stats
+            function updateStats() {
+                const playerStats = {};
+
+                // Initialize stats for all players
+                players.forEach(player => {
+                    playerStats[player.id] = {
+                        points: 0,
+                        playerId: player.id
+                    };
+                });
+
+                // Process each match
+                sessions.forEach(session => {
+                    session.matches.forEach(match => {
+                        const team1Score = parseInt(match.team1Score) || 0;
+                        const team2Score = parseInt(match.team2Score) || 0;
+
+                        // Add points to each player on both teams
+                        match.team1.forEach((playerId) => {
+                            playerStats[playerId].points += team1Score;
+                        });
+                        match.team2.forEach((playerId) => {
+                            playerStats[playerId].points += team2Score;
+                        });
+                    });
+                });
+
+                // Sort players by points (descending)
+                const sortedPlayers = Object.values(playerStats).sort((a, b) => {
+                    return b.points - a.points;
+                });
+
+                // Get the summary grid container
+                const summaryGrid = document.getElementById('summaryGrid');
+                summaryGrid.innerHTML = '';
+
+                // Re-create summary items in ranked order
+                sortedPlayers.forEach((player, index) => {
+                    const place = index + 1;
+                    let placeText;
+                    if (place === 1) placeText = '1st Place';
+                    else if (place === 2) placeText = '2nd Place';
+                    else if (place === 3) placeText = '3rd Place';
+                    else placeText = `${place}th Place`;
+
+                    // Determine rank badge class
+                    let rankBadgeClass = 'rank-badge';
+                    let summaryItemClass = 'summary-item';
+                    if (index === 0) {
+                        rankBadgeClass += ' first';
+                        summaryItemClass += ' winner';
+                    } else if (index === 1) {
+                        rankBadgeClass += ' second';
+                        summaryItemClass += ' second';
+                    } else if (index === 2) {
+                        rankBadgeClass += ' third';
+                        summaryItemClass += ' third';
+                    }
+
+                    const playerObj = players.find(p => p.id === player.playerId);
+                    const playerName = playerObj ? playerObj.name : `Player ${player.playerId + 1}`;
+
+                    // Create new summary item
+                    const summaryDiv = document.createElement('div');
+                    summaryDiv.className = summaryItemClass;
+                    summaryDiv.id = `summary-${player.playerId}`;
+                    summaryDiv.innerHTML = `
+                        <div class="${rankBadgeClass}" id="rank-badge-${player.playerId}">${place}</div>
+                        <div class="player-name">${playerName}</div>
+                        <div class="points">${player.points} Points</div>
+                        <div class="rank" id="rank-${player.playerId}">${placeText}</div>
+                    `;
+                    summaryGrid.appendChild(summaryDiv);
+                });
+            }
+
+            // Toast notification function
+            function showToast(message, isError = false) {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.className = `toast ${isError ? 'error' : ''}`;
+                toast.classList.add('show');
+
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000);
+            }
+
+            // Get saved seasons from localStorage
+            function getSavedSeasons() {
+                try {
+                    const saved = localStorage.getItem('savedSeasons');
+                    return saved ? JSON.parse(saved) : {};
+                } catch (e) {
+                    console.error('Error reading saved seasons:', e);
+                    return {};
+                }
+            }
+
+            // Save seasons to localStorage
+            function setSavedSeasons(seasons) {
+                try {
+                    localStorage.setItem('savedSeasons', JSON.stringify(seasons));
+                } catch (e) {
+                    console.error('Error saving seasons:', e);
+                    showToast('Error saving to local storage. Storage may be full.', true);
+                }
+            }
+
+            // Save season data to localStorage
+            function saveToLocalStorage() {
+                if (sessions.length === 0) {
+                    showToast('No season data to save', true);
+                    return;
+                }
+
+                const seasonName = prompt('Enter a name for this season:');
+                if (!seasonName || seasonName.trim() === '') {
+                    showToast('Season name is required', true);
+                    return;
+                }
+
+                const seasonData = {
+                    version: '1.0',
+                    timestamp: new Date().toISOString(),
+                    seasonName: seasonName.trim(),
+                    numCourts: numCourts,
+                    playerCount: currentPlayerCount,
+                    players: players.map(p => ({ id: p.id, name: p.name })),
+                    sessions: sessions.map(session => ({
+                        sessionId: session.sessionId,
+                        date: session.date || getCurrentDate(),
+                        courtAssignments: session.courtAssignments,
+                        matches: session.matches.map(match => ({
+                            court: match.court,
+                            team1: match.team1,
+                            team2: match.team2,
+                            team1Score: match.team1Score || '',
+                            team2Score: match.team2Score || ''
+                        }))
+                    }))
+                };
+
+                const savedSeasons = getSavedSeasons();
+                savedSeasons[seasonName.trim()] = seasonData;
+                setSavedSeasons(savedSeasons);
+
+                showToast(`Season "${seasonName.trim()}" saved successfully!`);
+            }
+
+            // Show load season dialog
+            function showLoadSeasonDialog() {
+                const dialog = document.getElementById('loadSeasonDialog');
+                const list = document.getElementById('savedSeasonsList');
+                
+                const savedSeasons = getSavedSeasons();
+                const seasonNames = Object.keys(savedSeasons).sort();
+
+                if (seasonNames.length === 0) {
+                    list.innerHTML = '<p style="color: #666;">No saved seasons found.</p>';
+                } else {
+                    list.innerHTML = '';
+                    seasonNames.forEach(name => {
+                        const season = savedSeasons[name];
+                        const seasonDiv = document.createElement('div');
+                        seasonDiv.style.cssText = 'padding: 15px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; background-color: #f8f9fa;';
+                        seasonDiv.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong style="color: #2c5aa0;">${name}</strong>
+                                    <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                                        ${season.numCourts} court(s) • ${season.sessions.length} session(s) • Saved: ${new Date(season.timestamp).toLocaleDateString()}
+                                    </div>
+                                </div>
+                                <div>
+                                    <button class="btn" onclick="loadSeasonFromStorage('${name}')" style="background-color: #20c997; color: white; margin-right: 5px;">Load</button>
+                                    <button class="btn" onclick="deleteSeasonFromStorage('${name}')" style="background-color: #dc3545; color: white;">Delete</button>
+                                </div>
+                            </div>
+                        `;
+                        list.appendChild(seasonDiv);
+                    });
+                }
+
+                dialog.style.display = 'flex';
+            }
+
+            // Hide load season dialog
+            function hideLoadSeasonDialog() {
+                document.getElementById('loadSeasonDialog').style.display = 'none';
+            }
+
+            // Load season from localStorage
+            function loadSeasonFromStorage(seasonName) {
+                const savedSeasons = getSavedSeasons();
+                const seasonData = savedSeasons[seasonName];
+
+                if (!seasonData) {
+                    showToast('Season not found', true);
+                    return;
+                }
+
+                // Confirm before loading (will overwrite current data)
+                if (!confirm(`Load season "${seasonName}"? This will replace your current season data.`)) {
+                    return;
+                }
+
+                try {
+                    // Load data
+                    numCourts = seasonData.numCourts;
+                    currentPlayerCount = seasonData.playerCount;
+                    players = seasonData.players.map(p => ({ id: p.id, name: p.name }));
+                    sessions = seasonData.sessions.map(session => ({
+                        sessionId: session.sessionId,
+                        date: session.date || 'Date not set',
+                        courtAssignments: session.courtAssignments,
+                        matches: session.matches.map(match => ({
+                            court: match.court,
+                            team1: match.team1,
+                            team2: match.team2,
+                            team1Score: match.team1Score || '',
+                            team2Score: match.team2Score || ''
+                        }))
+                    }));
+
+                    // Update current session ID
+                    if (sessions.length > 0) {
+                        currentSessionId = Math.max(...sessions.map(s => s.sessionId)) + 1;
+                    } else {
+                        currentSessionId = 0;
+                    }
+
+                    // Rebuild teammate tracking
+                    currentSessionTeammateCounts = {};
+                    sessions.forEach(session => {
+                        initializeSessionTeammateTracking(session.sessionId, session.courtAssignments);
+                        session.matches.forEach(match => {
+                            recordTeammatePairing(session.sessionId, match.court, match.team1);
+                            recordTeammatePairing(session.sessionId, match.court, match.team2);
+                        });
+                    });
+
+                    // Update UI
+                    document.getElementById('numCourts').value = numCourts;
+                    document.getElementById('playerCountDisplay').textContent = `${currentPlayerCount} players`;
+                    document.getElementById('playerSection').style.display = 'block';
+                    document.getElementById('matchControls').style.display = 'block';
+
+                    generatePlayerInputs();
+                    renderAllSessions();
+                    generateSummarySection();
+                    updateMatchStatus();
+                    updateStats();
+
+                    hideLoadSeasonDialog();
+                    showToast(`Season "${seasonName}" loaded successfully!`);
+                } catch (error) {
+                    console.error('Load error:', error);
+                    showToast('Error loading season data', true);
+                }
+            }
+
+            // Delete season from localStorage
+            function deleteSeasonFromStorage(seasonName) {
+                if (!confirm(`Delete season "${seasonName}"? This action cannot be undone.`)) {
+                    return;
+                }
+
+                const savedSeasons = getSavedSeasons();
+                delete savedSeasons[seasonName];
+                setSavedSeasons(savedSeasons);
+
+                // Refresh the dialog
+                showLoadSeasonDialog();
+                showToast(`Season "${seasonName}" deleted successfully!`);
+            }
+
+            // Export season data
+            function exportData() {
+                if (sessions.length === 0) {
+                    showToast('No season data to export', true);
+                    return;
+                }
+
+                const exportData = {
+                    version: '1.0',
+                    timestamp: new Date().toISOString(),
+                    numCourts: numCourts,
+                    playerCount: currentPlayerCount,
+                    players: players.map(p => ({ id: p.id, name: p.name })),
+                    sessions: sessions.map(session => ({
+                        sessionId: session.sessionId,
+                        date: session.date || getCurrentDate(),
+                        courtAssignments: session.courtAssignments,
+                        matches: session.matches.map(match => ({
+                            court: match.court,
+                            team1: match.team1,
+                            team2: match.team2,
+                            team1Score: match.team1Score || '',
+                            team2Score: match.team2Score || ''
+                        }))
+                    }))
+                };
+
+                // Create and download file
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `pickleball-season-${numCourts}courts-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                showToast('Season data exported successfully!');
+            }
+
+            // Import season data
+            function importData(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    try {
+                        const seasonData = JSON.parse(e.target.result);
+
+                        // Validate data structure
+                        if (!seasonData.players || !seasonData.sessions || seasonData.numCourts === undefined) {
+                            throw new Error('Invalid season data format');
+                        }
+
+                        // Load data
+                        numCourts = seasonData.numCourts;
+                        currentPlayerCount = seasonData.playerCount;
+                        players = seasonData.players.map(p => ({ id: p.id, name: p.name }));
+                        sessions = seasonData.sessions.map(session => ({
+                            sessionId: session.sessionId,
+                            date: session.date || 'Date not set',
+                            courtAssignments: session.courtAssignments,
+                            matches: session.matches.map(match => ({
+                                court: match.court,
+                                team1: match.team1,
+                                team2: match.team2,
+                                team1Score: match.team1Score || '',
+                                team2Score: match.team2Score || ''
+                            }))
+                        }));
+
+                        // Update current session ID
+                        if (sessions.length > 0) {
+                            currentSessionId = Math.max(...sessions.map(s => s.sessionId)) + 1;
+                        } else {
+                            currentSessionId = 0;
+                        }
+
+                        // Rebuild teammate tracking
+                        currentSessionTeammateCounts = {};
+                        sessions.forEach(session => {
+                            initializeSessionTeammateTracking(session.sessionId, session.courtAssignments);
+                            session.matches.forEach(match => {
+                                recordTeammatePairing(session.sessionId, match.court, match.team1);
+                                recordTeammatePairing(session.sessionId, match.court, match.team2);
+                            });
+                        });
+
+                        // Update UI
+                        document.getElementById('numCourts').value = numCourts;
+                        document.getElementById('playerCountDisplay').textContent = `${currentPlayerCount} players`;
+                        document.getElementById('playerSection').style.display = 'block';
+                        document.getElementById('matchControls').style.display = 'block';
+
+                        generatePlayerInputs();
+                        renderAllSessions();
+                        generateSummarySection();
+                        updateMatchStatus();
+                        updateStats();
+
+                        showToast('Season data imported successfully!');
+                    } catch (error) {
+                        console.error('Import error:', error);
+                        showToast('Error importing season data. Please check the file format.', true);
+                    }
+                };
+
+                reader.readAsText(file);
+                event.target.value = '';
+            }
+
+            // Clear all data
+            function clearAllData() {
+                if (confirm('Are you sure you want to clear all season data? This action cannot be undone.')) {
+                    // Clear player names
+                    players.forEach((player, index) => {
+                        const input = document.getElementById(`player${index}`);
+                        if (input) input.value = '';
+                    });
+
+                    // Reset data
+                    sessions = [];
+                    currentSessionId = 0;
+                    currentSessionTeammateCounts = {};
+
+                    // Update displays
+                    renderAllSessions();
+                    updateStats();
+                    updateMatchStatus();
+
+                    showToast('All season data cleared!');
+                }
+            }
+
+            // Print season summary
+            function printSeasonSummary() {
+                if (sessions.length === 0) {
+                    showToast('No season data to print', true);
+                    return;
+                }
+
+                // Calculate player points
+                const playerPoints = {};
+                players.forEach(player => {
+                    playerPoints[player.id] = 0;
+                });
+
+                sessions.forEach(session => {
+                    session.matches.forEach(match => {
+                        const team1Score = parseInt(match.team1Score) || 0;
+                        const team2Score = parseInt(match.team2Score) || 0;
+                        match.team1.forEach(playerId => {
+                            playerPoints[playerId] += team1Score;
+                        });
+                        match.team2.forEach(playerId => {
+                            playerPoints[playerId] += team2Score;
+                        });
+                    });
+                });
+
+                const sortedPlayers = [...players].sort((a, b) => playerPoints[b.id] - playerPoints[a.id]);
+
+                // Build the summary HTML
+                let summaryHTML = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Season Summary</title>
+    <style>
+        @media print {
+            body { margin: 0; padding: 20px; }
+            .no-print { display: none; }
+            .page-break { page-break-after: always; }
+        }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 20px;
+        }
+        .match-result {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .team {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 8px;
+            background-color: white;
+            border-radius: 3px;
+        }
+        .score {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .vs {
+            text-align: center;
+            margin: 5px 0;
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+        .standings-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        .standings-table th,
+        .standings-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .standings-table th {
+            background-color: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        .standings-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .standings-table tr:first-child {
+            background-color: #d4edda;
+        }
+        .session-section {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏓 Pickleball Season Summary</h1>
+    <p style="text-align: center; color: #7f8c8d;">
+        Generated on ${new Date().toLocaleString()}
+    </p>
+`;
+
+                // Add all sessions and matches
+                summaryHTML += '<h2>Match Results</h2>\n';
+                
+                sessions.forEach((session, sessionIndex) => {
+                    summaryHTML += `<div class="session-section">\n`;
+                    const sessionDate = session.date || 'Date not set';
+                    summaryHTML += `<h3>Session ${sessionIndex + 1} - ${sessionDate}</h3>\n`;
+                    
+                    // Group matches by court
+                    const matchesByCourt = {};
+                    session.matches.forEach(match => {
+                        if (!matchesByCourt[match.court]) {
+                            matchesByCourt[match.court] = [];
+                        }
+                        matchesByCourt[match.court].push(match);
+                    });
+
+                    Object.keys(matchesByCourt).sort((a, b) => parseInt(a) - parseInt(b)).forEach(courtNum => {
+                        const courtMatches = matchesByCourt[courtNum];
+                        courtMatches.forEach(match => {
+                            const team1Names = `${players.find(p => p.id === match.team1[0]).name} & ${players.find(p => p.id === match.team1[1]).name}`;
+                            const team2Names = `${players.find(p => p.id === match.team2[0]).name} & ${players.find(p => p.id === match.team2[1]).name}`;
+                            const team1Score = parseInt(match.team1Score) || 0;
+                            const team2Score = parseInt(match.team2Score) || 0;
+                            
+                            summaryHTML += `
+    <div class="match-result">
+        <div style="font-weight: bold; color: #3498db; margin-bottom: 5px;">Court ${parseInt(courtNum) + 1}</div>
+        <div class="team">
+            <span>${team1Names}</span>
+            <span class="score">${team1Score}</span>
+        </div>
+        <div class="vs">VS</div>
+        <div class="team">
+            <span>${team2Names}</span>
+            <span class="score">${team2Score}</span>
+        </div>
+    </div>
+`;
+                        });
+                    });
+                    
+                    summaryHTML += '</div>\n';
+                });
+
+                // Add final standings
+                summaryHTML += '<h2>Final Standings</h2>\n';
+                summaryHTML += `
+    <table class="standings-table">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Player</th>
+                <th>Points</th>
+            </tr>
+        </thead>
+        <tbody>
+`;
+
+                sortedPlayers.forEach((player, index) => {
+                    const place = index + 1;
+                    summaryHTML += `
+            <tr>
+                <td>${place}</td>
+                <td>${player.name}</td>
+                <td>${playerPoints[player.id]}</td>
+            </tr>
+`;
+                });
+
+                summaryHTML += `
+        </tbody>
+    </table>
+    <div class="no-print" style="text-align: center; margin: 20px 0;">
+        <button onclick="window.print()" style="background-color: #3498db; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 5px; cursor: pointer;">🖨️ Print Summary</button>
+    </div>
+</body>
+</html>
+`;
+
+                // Open in new window and print
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(summaryHTML);
+                printWindow.document.close();
+                
+                // Wait for content to load, then trigger print dialog
+                printWindow.onload = function() {
+                    setTimeout(() => {
+                        printWindow.print();
+                    }, 250);
+                };
+
+                showToast('Season summary opened in new window');
+            }
+        </script>
+    </body>
+</html>
