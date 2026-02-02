@@ -76,6 +76,91 @@
                 opacity: 0;
                 margin-bottom: 0;
             }
+            .subs-section {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 5px;
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+            .subs-section h4 {
+                margin-top: 0;
+                margin-bottom: 10px;
+                color: #2c5aa0;
+                font-size: 1em;
+            }
+            .add-sub-form {
+                display: flex;
+                gap: 10px;
+                align-items: flex-end;
+                margin-bottom: 15px;
+                flex-wrap: wrap;
+            }
+            .add-sub-form input,
+            .add-sub-form select {
+                padding: 8px;
+                border: 1px solid #ced4da;
+                border-radius: 4px;
+                font-size: 0.9em;
+            }
+            .add-sub-form input[type="text"] {
+                flex: 1;
+                min-width: 150px;
+            }
+            .add-sub-form select {
+                flex: 1;
+                min-width: 200px;
+            }
+            .add-sub-form button {
+                padding: 8px 15px;
+                background-color: #28a745;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 0.9em;
+            }
+            .add-sub-form button:hover {
+                background-color: #218838;
+            }
+            .subs-list {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .sub-item {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 8px;
+                background-color: white;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+            }
+            .sub-item-info {
+                flex: 1;
+            }
+            .sub-item-name {
+                font-weight: bold;
+                color: #2c5aa0;
+            }
+            .sub-item-for {
+                font-size: 0.9em;
+                color: #6c757d;
+                margin-left: 10px;
+            }
+            .sub-item button {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 5px 10px;
+                cursor: pointer;
+                font-size: 0.85em;
+            }
+            .sub-item button:hover {
+                background-color: #c82333;
+            }
             .previous-points {
                 font-size: 0.85em;
                 color: #666;
@@ -210,6 +295,7 @@
             let currentSessionId = 0;
             let currentSessionTeammateCounts = {}; // Track teammate pairings per session: {sessionId: {court: {playerId: {teammateId: count}}}}
             let sessionCollapsedState = {}; // Track collapsed state for each session: {sessionId: boolean}
+            let sessionSubs = {}; // Track subs per session: {sessionId: [{subName: string, subbingFor: playerId, court: number}]}
 
             // Update player count display
             function updatePlayerCount() {
@@ -233,6 +319,8 @@
                 sessions = [];
                 currentSessionId = 0;
                 currentSessionTeammateCounts = {};
+                sessionCollapsedState = {};
+                sessionSubs = {};
 
                 // Initialize players
                 for (let i = 0; i < currentPlayerCount; i++) {
@@ -579,6 +667,176 @@
                 showToast('New courts generated based on current standings!');
             }
 
+            // Helper function to get player name by ID
+            function getPlayerNameById(playerId) {
+                const player = players.find(p => p.id === playerId);
+                return player ? player.name : `Player ${playerId + 1}`;
+            }
+
+            // Helper function to get sub name for a player in a session
+            function getSubName(sessionId, playerId) {
+                if (!sessionSubs[sessionId]) return null;
+                const sub = sessionSubs[sessionId].find(s => s.subbingFor === playerId);
+                return sub ? sub.subName : null;
+            }
+
+            // Helper function to get the display name (sub name if exists, otherwise player name)
+            function getDisplayName(sessionId, playerId) {
+                const subName = getSubName(sessionId, playerId);
+                if (subName) {
+                    return subName; // Just return sub name, tooltip will show who they're subbing for
+                }
+                return getPlayerNameById(playerId);
+            }
+
+            // Helper function to get tooltip text for a player (shows sub info if applicable)
+            function getPlayerTooltip(sessionId, playerId) {
+                const subName = getSubName(sessionId, playerId);
+                if (subName) {
+                    return `Subbing for ${getPlayerNameById(playerId)}`;
+                }
+                return '';
+            }
+
+            // Helper function to get full display name for exports (includes sub info)
+            function getFullDisplayName(sessionId, playerId) {
+                const subName = getSubName(sessionId, playerId);
+                if (subName) {
+                    return `${subName} (subbing for ${getPlayerNameById(playerId)})`;
+                }
+                return getPlayerNameById(playerId);
+            }
+
+            // Create subs section for a session
+            function createSubsSection(sessionId, courtAssignments) {
+                const subsSection = document.createElement('div');
+                subsSection.className = 'subs-section';
+                
+                // Get all players assigned to courts in this session
+                const sessionPlayers = [];
+                courtAssignments.forEach((courtPlayers, courtIndex) => {
+                    courtPlayers.forEach(playerId => {
+                        if (!sessionPlayers.find(p => p.id === playerId)) {
+                            sessionPlayers.push({
+                                id: playerId,
+                                name: getPlayerNameById(playerId),
+                                court: courtIndex
+                            });
+                        }
+                    });
+                });
+
+                // Get existing subs for this session
+                const existingSubs = sessionSubs[sessionId] || [];
+
+                subsSection.innerHTML = `
+                    <h4>Substitutes</h4>
+                    <div class="add-sub-form">
+                        <input type="text" id="sub-name-${sessionId}" placeholder="Sub name" />
+                        <select id="sub-for-${sessionId}">
+                            <option value="">Select player to sub for...</option>
+                            ${sessionPlayers.map(p => `<option value="${p.id}">${p.name} (Court ${p.court + 1})</option>`).join('')}
+                        </select>
+                        <button onclick="addSub(${sessionId})">Add Sub</button>
+                    </div>
+                    <div class="subs-list" id="subs-list-${sessionId}">
+                        ${existingSubs.map((sub, index) => `
+                            <div class="sub-item">
+                                <div class="sub-item-info">
+                                    <span class="sub-item-name">${sub.subName}</span>
+                                    <span class="sub-item-for">→ subbing for ${getPlayerNameById(sub.subbingFor)} (Court ${sub.court + 1})</span>
+                                </div>
+                                <button onclick="removeSub(${sessionId}, ${index})">Remove</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+
+                return subsSection;
+            }
+
+            // Add a sub to a session
+            function addSub(sessionId) {
+                const subNameInput = document.getElementById(`sub-name-${sessionId}`);
+                const subForSelect = document.getElementById(`sub-for-${sessionId}`);
+                
+                const subName = subNameInput.value.trim();
+                const subbingFor = parseInt(subForSelect.value);
+
+                if (!subName) {
+                    showToast('Please enter a sub name', true);
+                    return;
+                }
+
+                if (!subbingFor && subbingFor !== 0) {
+                    showToast('Please select a player to sub for', true);
+                    return;
+                }
+
+                // Find which court this player is on
+                const session = sessions.find(s => s.sessionId === sessionId);
+                if (!session) {
+                    showToast('Session not found', true);
+                    return;
+                }
+
+                let playerCourt = -1;
+                session.courtAssignments.forEach((courtPlayers, courtIndex) => {
+                    if (courtPlayers.includes(subbingFor)) {
+                        playerCourt = courtIndex;
+                    }
+                });
+
+                if (playerCourt === -1) {
+                    showToast('Player not found in session', true);
+                    return;
+                }
+
+                // Check if this player already has a sub
+                if (!sessionSubs[sessionId]) {
+                    sessionSubs[sessionId] = [];
+                }
+
+                const existingSubIndex = sessionSubs[sessionId].findIndex(s => s.subbingFor === subbingFor);
+                if (existingSubIndex !== -1) {
+                    showToast('This player already has a sub. Remove it first to add a new one.', true);
+                    return;
+                }
+
+                // Add the sub
+                sessionSubs[sessionId].push({
+                    subName: subName,
+                    subbingFor: subbingFor,
+                    court: playerCourt
+                });
+
+                // Clear inputs
+                subNameInput.value = '';
+                subForSelect.value = '';
+
+                // Re-render to show the new sub
+                renderAllSessions();
+                updateStats();
+                showToast(`Sub "${subName}" added successfully!`);
+            }
+
+            // Remove a sub from a session
+            function removeSub(sessionId, subIndex) {
+                if (!sessionSubs[sessionId] || !sessionSubs[sessionId][subIndex]) {
+                    showToast('Sub not found', true);
+                    return;
+                }
+
+                sessionSubs[sessionId].splice(subIndex, 1);
+                if (sessionSubs[sessionId].length === 0) {
+                    delete sessionSubs[sessionId];
+                }
+
+                renderAllSessions();
+                updateStats();
+                showToast('Sub removed successfully!');
+            }
+
             // Render all sessions
             function renderAllSessions() {
                 // Save existing scores before clearing
@@ -611,6 +869,10 @@
                         }
                     };
                     sessionDiv.appendChild(headerDiv);
+
+                    // Add subs section
+                    const subsSection = createSubsSection(session.sessionId, session.courtAssignments);
+                    sessionDiv.appendChild(subsSection);
 
                     const matchesDiv = document.createElement('div');
                     matchesDiv.className = `matches session-matches ${isCollapsed ? 'collapsed' : ''}`;
@@ -660,14 +922,14 @@
                                 <div style="margin-top: 8px;">
                                     <div class="team">
                                         <span class="team-names">
-                                            <span class="player-display" data-players="${match.team1[0]},${match.team1[1]}"></span>
+                                            <span class="player-display" data-session="${session.sessionId}" data-players="${match.team1[0]},${match.team1[1]}"></span>
                                         </span>
                                         <input type="number" class="score-input" data-session="${session.sessionId}" data-court="${match.court}" data-match="${matchIndex}" data-team="0" placeholder="Score" value="${team0Score}" />
                                     </div>
                                     <div class="vs">VS</div>
                                     <div class="team">
                                         <span class="team-names">
-                                            <span class="player-display" data-players="${match.team2[0]},${match.team2[1]}"></span>
+                                            <span class="player-display" data-session="${session.sessionId}" data-players="${match.team2[0]},${match.team2[1]}"></span>
                                         </span>
                                         <input type="number" class="score-input" data-session="${session.sessionId}" data-court="${match.court}" data-match="${matchIndex}" data-team="1" placeholder="Score" value="${team1Score}" />
                                     </div>
@@ -765,12 +1027,29 @@
             function updatePlayerDisplays() {
                 // Update all player displays in matches
                 document.querySelectorAll('.player-display').forEach((display) => {
+                    const sessionId = parseInt(display.getAttribute('data-session'));
                     const playerNumbers = display.getAttribute('data-players').split(',');
                     const playerNames = playerNumbers.map((num) => {
-                        const player = players.find(p => p.id === parseInt(num));
-                        return player ? player.name : `Player ${parseInt(num) + 1}`;
+                        const playerId = parseInt(num);
+                        return getDisplayName(sessionId, playerId);
                     });
+                    
+                    // Build tooltip text for both players
+                    const tooltips = playerNumbers.map((num) => {
+                        const playerId = parseInt(num);
+                        return getPlayerTooltip(sessionId, playerId);
+                    }).filter(t => t); // Remove empty tooltips
+                    
                     display.textContent = playerNames.join(' & ');
+                    
+                    // Add tooltip if any player has a sub
+                    if (tooltips.length > 0) {
+                        display.setAttribute('title', tooltips.join(' | '));
+                        display.style.cursor = 'help';
+                    } else {
+                        display.removeAttribute('title');
+                        display.style.cursor = '';
+                    }
                 });
             }
 
@@ -915,7 +1194,8 @@
                             team1Score: match.team1Score || '',
                             team2Score: match.team2Score || ''
                         }))
-                    }))
+                    })),
+                    sessionSubs: sessionSubs
                 };
 
                 const savedSeasons = getSavedSeasons();
@@ -1007,6 +1287,9 @@
                         currentSessionId = 0;
                     }
 
+                    // Load subs
+                    sessionSubs = seasonData.sessionSubs || {};
+
                     // Rebuild teammate tracking
                     currentSessionTeammateCounts = {};
                     sessions.forEach(session => {
@@ -1076,7 +1359,8 @@
                             team1Score: match.team1Score || '',
                             team2Score: match.team2Score || ''
                         }))
-                    }))
+                    })),
+                    sessionSubs: sessionSubs
                 };
 
                 // Create and download file
@@ -1125,31 +1409,60 @@
                         numCourts: numCourts,
                         courtAssignments: session.courtAssignments.map((courtPlayers, courtIndex) => ({
                             court: courtIndex + 1,
-                            players: courtPlayers.map(playerId => ({
-                                id: playerId,
-                                name: getPlayerName(playerId)
-                            }))
+                            players: courtPlayers.map(playerId => {
+                                const sub = sessionSubs[sessionId]?.find(s => s.subbingFor === playerId);
+                                return {
+                                    id: playerId,
+                                    name: getPlayerName(playerId),
+                                    sub: sub ? {
+                                        name: sub.subName,
+                                        subbingFor: playerId
+                                    } : null
+                                };
+                            })
                         })),
                         matches: session.matches.map((match, matchIndex) => {
-                            const team1Names = match.team1.map(id => getPlayerName(id));
-                            const team2Names = match.team2.map(id => getPlayerName(id));
+                            const team1Names = match.team1.map(id => {
+                                const sub = sessionSubs[sessionId]?.find(s => s.subbingFor === id);
+                                return sub ? `${sub.subName} (subbing for ${getPlayerName(id)})` : getPlayerName(id);
+                            });
+                            const team2Names = match.team2.map(id => {
+                                const sub = sessionSubs[sessionId]?.find(s => s.subbingFor === id);
+                                return sub ? `${sub.subName} (subbing for ${getPlayerName(id)})` : getPlayerName(id);
+                            });
                             
                             return {
                                 matchNumber: matchIndex + 1,
                                 court: match.court + 1,
                                 team1: {
-                                    players: match.team1.map(id => ({
-                                        id: id,
-                                        name: getPlayerName(id)
-                                    })),
+                                    players: match.team1.map(id => {
+                                        const sub = sessionSubs[sessionId]?.find(s => s.subbingFor === id);
+                                        return {
+                                            id: id,
+                                            name: getPlayerName(id),
+                                            sub: sub ? {
+                                                name: sub.subName,
+                                                subbingFor: id
+                                            } : null,
+                                            displayName: sub ? `${sub.subName} (subbing for ${getPlayerName(id)})` : getPlayerName(id)
+                                        };
+                                    }),
                                     playerNames: team1Names.join(' & '),
                                     score: match.team1Score || ''
                                 },
                                 team2: {
-                                    players: match.team2.map(id => ({
-                                        id: id,
-                                        name: getPlayerName(id)
-                                    })),
+                                    players: match.team2.map(id => {
+                                        const sub = sessionSubs[sessionId]?.find(s => s.subbingFor === id);
+                                        return {
+                                            id: id,
+                                            name: getPlayerName(id),
+                                            sub: sub ? {
+                                                name: sub.subName,
+                                                subbingFor: id
+                                            } : null,
+                                            displayName: sub ? `${sub.subName} (subbing for ${getPlayerName(id)})` : getPlayerName(id)
+                                        };
+                                    }),
                                     playerNames: team2Names.join(' & '),
                                     score: match.team2Score || ''
                                 },
@@ -1159,7 +1472,8 @@
                                         `${team2Names.join(' & ')} won`) : 
                                     'No score recorded'
                             };
-                        })
+                        }),
+                        subs: sessionSubs[sessionId] || []
                     },
                     // Include full player list for reference
                     allPlayers: players.map(p => ({ id: p.id, name: p.name }))
@@ -1355,12 +1669,12 @@
                     
                     // Get court players
                     const courtPlayers = session.courtAssignments[parseInt(courtNum)];
-                    const playerNames = courtPlayers.map(id => getPlayerName(id)).join(', ');
+                    const playerNames = courtPlayers.map(id => getFullDisplayName(sessionId, id)).join(', ');
                     sessionHTML += `<div style="font-size: 0.9em; color: #7f8c8d; margin-bottom: 10px;">Players: ${playerNames}</div>\n`;
                     
                     courtMatches.forEach((match, matchIndex) => {
-                        const team1Names = `${getPlayerName(match.team1[0])} & ${getPlayerName(match.team1[1])}`;
-                        const team2Names = `${getPlayerName(match.team2[0])} & ${getPlayerName(match.team2[1])}`;
+                        const team1Names = `${getFullDisplayName(sessionId, match.team1[0])} & ${getFullDisplayName(sessionId, match.team1[1])}`;
+                        const team2Names = `${getFullDisplayName(sessionId, match.team2[0])} & ${getFullDisplayName(sessionId, match.team2[1])}`;
                         const team1Score = parseInt(match.team1Score) || 0;
                         const team2Score = parseInt(match.team2Score) || 0;
                         
@@ -1472,6 +1786,9 @@
                             currentSessionId = 0;
                         }
 
+                        // Load subs
+                        sessionSubs = seasonData.sessionSubs || {};
+
                         // Rebuild teammate tracking
                         currentSessionTeammateCounts = {};
                         sessions.forEach(session => {
@@ -1518,6 +1835,8 @@
                     sessions = [];
                     currentSessionId = 0;
                     currentSessionTeammateCounts = {};
+                    sessionCollapsedState = {};
+                    sessionSubs = {};
 
                     // Update displays
                     renderAllSessions();
