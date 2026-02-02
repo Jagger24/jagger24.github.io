@@ -317,6 +317,7 @@
                 flex: 0 0 120px;
             }
         </style>
+        <script src="dupr-export.js"></script>
     </head>
     <body>
         <div class="container">
@@ -539,18 +540,24 @@
                 playersLocked = !playersLocked;
                 updateLockSection();
                 
-                // Enable/disable all player inputs
+                // Enable/disable all player inputs (name and DuprId)
                 players.forEach((player, index) => {
-                    const input = document.getElementById(`player${index}`);
-                    if (input) {
-                        input.disabled = playersLocked;
+                    const nameInput = document.getElementById(`player${index}`);
+                    const duprInput = document.getElementById(`player${index}DuprId`);
+                    
+                    if (nameInput) {
+                        nameInput.disabled = playersLocked;
+                    }
+                    
+                    if (duprInput) {
+                        duprInput.disabled = playersLocked;
                     }
                 });
 
                 if (playersLocked) {
-                    showToast('Players locked! Names cannot be changed.', false);
+                    showToast('Players locked! Names and DuprIds cannot be changed.', false);
                 } else {
-                    showToast('Players unlocked. Names can now be changed.', false);
+                    showToast('Players unlocked. Names and DuprIds can now be changed.', false);
                 }
             }
 
@@ -1073,7 +1080,7 @@
                     headerDiv.innerHTML = `
                         <div class="header-content">
                             <span>Session ${sessionIndex + 1} - ${sessionDate}</span>
-                            <button class="export-btn" onclick="event.stopPropagation(); exportSessionData(${session.sessionId})" title="Export this session's data">📤 Export</button>
+                            <button class="export-btn" onclick="event.stopPropagation(); exportSessionToDUPRCSV(${session.sessionId})" title="Export this session's data for DUPR">📤 Export For DUPR</button>
                             <button class="print-btn" onclick="event.stopPropagation(); printSessionPDF(${session.sessionId})" title="Print/PDF this session">🖨️ PDF</button>
                         </div>
                         <span class="toggle-icon">▼</span>
@@ -1610,6 +1617,28 @@
                 URL.revokeObjectURL(url);
 
                 showToast('Season data exported successfully!');
+            }
+
+            // Export session to DUPR CSV format
+            function exportSessionToDUPRCSV(sessionId) {
+                const session = sessions.find(s => s.sessionId === sessionId);
+                if (!session) {
+                    showToast('Session not found', true);
+                    return;
+                }
+
+                if (!seasonName) {
+                    showToast('Season name is required for DUPR export', true);
+                    return;
+                }
+
+                try {
+                    exportSessionToDUPR(sessionId, session, players, sessionSubs, seasonName);
+                    showToast('DUPR CSV exported successfully!');
+                } catch (error) {
+                    console.error('DUPR export error:', error);
+                    showToast('Error exporting DUPR CSV', true);
+                }
             }
 
             // Export a single session's data
