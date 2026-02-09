@@ -532,7 +532,8 @@
 
             // Toggle lock players
             function toggleLockPlayers() {
-                if (!seasonName) {
+                // Check if season is initialized (has players)
+                if (players.length === 0) {
                     showToast('Please initialize season first', true);
                     return;
                 }
@@ -1418,6 +1419,7 @@
                         }))
                     })),
                     sessionSubs: sessionSubs,
+                    sessionCollapsedState: sessionCollapsedState,
                     playersLocked: playersLocked
                 };
 
@@ -1471,9 +1473,9 @@
             }
 
             // Load season from localStorage
-            function loadSeasonFromStorage(seasonName) {
+            function loadSeasonFromStorage(tempSeasonName) {
                 const savedSeasons = getSavedSeasons();
-                const seasonData = savedSeasons[seasonName];
+                const seasonData = savedSeasons[tempSeasonName];
 
                 if (!seasonData) {
                     showToast('Season not found', true);
@@ -1481,7 +1483,7 @@
                 }
 
                 // Confirm before loading (will overwrite current data)
-                if (!confirm(`Load season "${seasonName}"? This will replace your current season data.`)) {
+                if (!confirm(`Load season "${tempSeasonName}"? This will replace your current season data.`)) {
                     return;
                 }
 
@@ -1513,9 +1515,13 @@
                     // Load subs
                     sessionSubs = seasonData.sessionSubs || {};
 
-                    // Load season name and lock state
-                    seasonName = seasonData.seasonName || '';
+                    // Load season name and lock state - use saved seasonName or fallback to the key name
+                    const loadedSeasonName = seasonData.seasonName || tempSeasonName;
+                    seasonName = loadedSeasonName;
                     playersLocked = seasonData.playersLocked || false;
+
+                    // Initialize session collapsed state if not present
+                    sessionCollapsedState = seasonData.sessionCollapsedState || {};
 
                     // Rebuild teammate tracking
                     currentSessionTeammateCounts = {};
@@ -1536,12 +1542,15 @@
                     document.getElementById('playerSection').style.display = 'block';
                     document.getElementById('matchControls').style.display = 'block';
                     
-                    // Update season name display
+                    // Always set season name display (even if empty, set the input field)
+                    document.getElementById('seasonName').value = seasonName || '';
                     if (seasonName) {
-                        document.getElementById('seasonName').value = seasonName;
                         document.getElementById('seasonName').disabled = true;
                         document.getElementById('seasonNameDisplay').textContent = seasonName;
                         document.getElementById('seasonNameDisplay').style.display = 'block';
+                    } else {
+                        document.getElementById('seasonName').disabled = false;
+                        document.getElementById('seasonNameDisplay').style.display = 'none';
                     }
 
                     generatePlayerInputs();
@@ -1600,6 +1609,7 @@
                         }))
                     })),
                     sessionSubs: sessionSubs,
+                    sessionCollapsedState: sessionCollapsedState,
                     playersLocked: playersLocked
                 };
 
@@ -2063,9 +2073,12 @@
                         // Load subs
                         sessionSubs = seasonData.sessionSubs || {};
 
-                        // Load season name and lock state
+                        // Load season name and lock state - ensure it's always set
                         seasonName = seasonData.seasonName || '';
                         playersLocked = seasonData.playersLocked || false;
+
+                        // Initialize session collapsed state if not present
+                        sessionCollapsedState = seasonData.sessionCollapsedState || {};
 
                         // Rebuild teammate tracking
                         currentSessionTeammateCounts = {};
@@ -2086,12 +2099,15 @@
                         document.getElementById('playerSection').style.display = 'block';
                         document.getElementById('matchControls').style.display = 'block';
                         
-                        // Update season name display
+                        // Always set season name display (even if empty, set the input field)
+                        document.getElementById('seasonName').value = seasonName || '';
                         if (seasonName) {
-                            document.getElementById('seasonName').value = seasonName;
                             document.getElementById('seasonName').disabled = true;
                             document.getElementById('seasonNameDisplay').textContent = seasonName;
                             document.getElementById('seasonNameDisplay').style.display = 'block';
+                        } else {
+                            document.getElementById('seasonName').disabled = false;
+                            document.getElementById('seasonNameDisplay').style.display = 'none';
                         }
 
                         generatePlayerInputs();
