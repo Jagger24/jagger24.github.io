@@ -88,6 +88,14 @@ function exportSessionToDUPR(sessionId, session, players, sessionSubs, seasonNam
         'playerB2DuprId',
         'teamAGame1',
         'teamBGame1',
+        'teamAGame2',
+        'teamBGame2',
+        'teamAGame3',
+        'teamBGame3',
+        'teamAGame4',
+        'teamBGame4',
+        'teamAGame5',
+        'teamBGame5',
     ]);
 
     // Process each match
