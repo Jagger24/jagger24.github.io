@@ -384,7 +384,6 @@
 
             <!-- Match Controls -->
             <div class="round-controls" id="matchControls" style="display: none;">
-                <button class="btn btn-generate" onclick="generateNextMatch()">🎲 Generate Next Match</button>
                 <button class="btn btn-generate" onclick="generateNewCourts()" style="background-color: #17a2b8;">🔄 End Session and Generate New Courts</button>
                 <span id="matchStatus"></span>
             </div>
@@ -676,14 +675,26 @@
             }
 
             // Generate next match - keep same courts, switch teammates
-            function generateNextMatch() {
+            function generateNextMatch(sessionId) {
                 if (sessions.length === 0) {
                     showToast('Please initialize season first', true);
                     return;
                 }
 
-                const currentSession = sessions[sessions.length - 1];
-                const sessionId = currentSession.sessionId;
+                // If no sessionId provided, use the last session (backward compatibility)
+                let targetSession;
+                if (sessionId !== undefined) {
+                    targetSession = sessions.find(s => s.sessionId === sessionId);
+                    if (!targetSession) {
+                        showToast('Session not found', true);
+                        return;
+                    }
+                } else {
+                    targetSession = sessions[sessions.length - 1];
+                }
+
+                const currentSession = targetSession;
+                const currentSessionId = currentSession.sessionId;
                 const courtAssignments = currentSession.courtAssignments;
                 const existingMatches = currentSession.matches;
 
@@ -692,7 +703,7 @@
 
                 for (let court = 0; court < numCourts; court++) {
                     const courtPlayers = courtAssignments[court];
-                    const nextMatchup = findNextValidMatchup(courtPlayers, sessionId, court, existingMatches);
+                    const nextMatchup = findNextValidMatchup(courtPlayers, currentSessionId, court, existingMatches);
 
                     if (!nextMatchup) {
                         showToast(`Court ${court + 1}: All possible matchups have been played twice. Consider generating new courts.`, true);
@@ -721,8 +732,8 @@
 
                 // Record teammate pairings
                 newMatches.forEach(match => {
-                    recordTeammatePairing(sessionId, match.court, match.team1);
-                    recordTeammatePairing(sessionId, match.court, match.team2);
+                    recordTeammatePairing(currentSessionId, match.court, match.team1);
+                    recordTeammatePairing(currentSessionId, match.court, match.team2);
                 });
 
                 renderAllSessions();
@@ -755,35 +766,22 @@
                     team2: [courtPlayers[1], courtPlayers[3]]
                 };
                 
-                // Pattern:
-                // Games 1-2: pairing1 (twice)
-                // Games 3-4: pairing2 (twice)
-                // Games 5-6: pairing3 (twice)
-                // Games 7-9: cycle through pairings 1, 2, 3 (once each)
-                // Games 10+: repeat the 7-9 cycle
+                // Pattern: Switch partners after each game
+                // Game 1, 4, 7, 10, ... = pairing1 (0&3 vs 1&2)
+                // Game 2, 5, 8, 11, ... = pairing3 (0&2 vs 1&3)
+                // Game 3, 6, 9, 12, ... = pairing2 (0&1 vs 2&3)
+                // Cycle repeats: 1, 3, 2, 1, 3, 2, ...
                 
-                if (gameNumber <= 2) {
-                    // Games 1-2: pairing1
+                const cyclePosition = (gameNumber - 1) % 3;
+                if (cyclePosition === 0) {
+                    // Games 1, 4, 7, 10, ...
                     return pairing1;
-                } else if (gameNumber <= 4) {
-                    // Games 3-4: pairing2
-                    return pairing2;
-                } else if (gameNumber <= 6) {
-                    // Games 5-6: pairing3
+                } else if (cyclePosition === 1) {
+                    // Games 2, 5, 8, 11, ...
                     return pairing3;
                 } else {
-                    // Games 7+: cycle through pairings
-                    // Game 7, 10, 13, ... = pairing1
-                    // Game 8, 11, 14, ... = pairing2
-                    // Game 9, 12, 15, ... = pairing3
-                    const cyclePosition = ((gameNumber - 7) % 3);
-                    if (cyclePosition === 0) {
-                        return pairing1;
-                    } else if (cyclePosition === 1) {
-                        return pairing2;
-                    } else {
-                        return pairing3;
-                    }
+                    // Games 3, 6, 9, 12, ...
+                    return pairing2;
                 }
             }
 
@@ -1166,6 +1164,17 @@
                     });
 
                     sessionDiv.appendChild(matchesDiv);
+
+                    // Add "Generate Next Match" button at the bottom of each session
+                    const generateButtonDiv = document.createElement('div');
+                    generateButtonDiv.className = 'round-controls';
+                    generateButtonDiv.style.marginTop = '15px';
+                    generateButtonDiv.style.marginBottom = '10px';
+                    generateButtonDiv.innerHTML = `
+                        <button class="btn btn-generate" onclick="generateNextMatch(${session.sessionId})">🎲 Generate Next Match</button>
+                    `;
+                    sessionDiv.appendChild(generateButtonDiv);
+
                     tournamentSessions.appendChild(sessionDiv);
                 });
 

@@ -43,7 +43,7 @@ function exportSessionToDUPR(sessionId, session, players, sessionSubs, seasonNam
         };
     };
 
-    // Format date to MM/DD/YYYY
+    // Format date to YYYY-MM-DD
     const formatDate = (dateString) => {
         if (!dateString) return '';
         
@@ -66,7 +66,7 @@ function exportSessionToDUPR(sessionId, session, players, sessionSubs, seasonNam
         const day = String(date.getDate()).padStart(2, '0');
         const year = date.getFullYear();
         
-        return `${month}/${day}/${year}`;
+        return `${year}-${month}-${day}`;
     };
 
     // Build CSV rows
@@ -87,7 +87,7 @@ function exportSessionToDUPR(sessionId, session, players, sessionSubs, seasonNam
         'playerB2',
         'playerB2DuprId',
         'teamAGame1',
-        'teamBGame1'
+        'teamBGame1',
     ]);
 
     // Process each match
@@ -136,7 +136,7 @@ function exportSessionToDUPR(sessionId, session, players, sessionSubs, seasonNam
     }).join('\n');
 
     // Create and download file
-    const sessionDate = formatDate(session.date).replace(/\//g, '-') || 'session';
+    const sessionDate = formatDate(session.date) || 'session';
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
