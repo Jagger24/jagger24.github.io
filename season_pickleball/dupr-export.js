@@ -127,7 +127,15 @@ function exportSessionToDUPR(sessionId, session, players, sessionSubs, seasonNam
             team2Info[1].name, // playerB2
             team2Info[1].duprId, // playerB2DuprId
             team1Score, // teamAGame1
-            team2Score // teamBGame1
+            team2Score, // teamBGame1
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            ''
         ]);
     });
 
